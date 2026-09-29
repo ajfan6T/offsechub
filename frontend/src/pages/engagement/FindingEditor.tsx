@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { api } from "../../api";
-import { canLead, useUser } from "../../auth";
 import { CvssBuilder, useCvssScore } from "../../components/CvssBuilder";
 import {
   Button,
   Card,
   ConfirmButton,
   Field,
+  Lightbox,
   Loading,
   ScopeBadge,
   SeverityBadge,
@@ -16,7 +16,7 @@ import {
 } from "../../components/ui";
 import { FINDING_STATUSES, fmtBytes, fmtDateTime, SEVERITIES, titleCase } from "../../lib/format";
 import type { Evidence, Finding, FindingStatus, Severity } from "../../types";
-import { useEngagement, useTargets } from "./context";
+import { evidenceImages, evidenceUrl, uploadEvidence, useEngagement, useTargets } from "./context";
 
 export function FindingEditor() {
   const { findingId } = useParams();
@@ -31,8 +31,7 @@ export function FindingEditor() {
 }
 
 function Editor({ finding }: { finding: Finding | null }) {
-  const { base, canWrite, engagement } = useEngagement();
-  const user = useUser();
+  const { base, engagement } = useEngagement();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const targets = useTargets(base);
@@ -104,17 +103,15 @@ function Editor({ finding }: { finding: Finding | null }) {
           {finding ? <span className="mono muted">{finding.ref}</span> : "New finding"} <SeverityBadge severity={effectiveSeverity} score={form.cvss_vector ? score.data?.score : null} />
         </h2>
         <div className="actions">
-          {finding && canLead(user) && <Button onClick={() => toTemplate.mutate(undefined)} loading={toTemplate.isPending}>Save to library</Button>}
-          {canWrite && (
-            <Button variant="primary" disabled={!form.title} loading={save.isPending} onClick={() => save.mutate(undefined)}>
-              {finding ? "Save changes" : "Create finding"}
-            </Button>
-          )}
+          {finding && <Button onClick={() => toTemplate.mutate(undefined)} loading={toTemplate.isPending}>Save to library</Button>}
+          <Button variant="primary" disabled={!form.title} loading={save.isPending} onClick={() => save.mutate(undefined)}>
+            {finding ? "Save changes" : "Create finding"}
+          </Button>
         </div>
       </div>
       <div className="grid-2-1 align-start">
         <Card>
-          <fieldset disabled={!canWrite} className="form-grid">
+          <div className="form-grid">
             <Field label="Title" wide>
               <input className="input-lg" value={form.title} onChange={set("title")} autoFocus={!finding} placeholder="e.g. Stored XSS in support ticket subject" />
             </Field>
@@ -135,7 +132,7 @@ function Editor({ finding }: { finding: Finding | null }) {
               </select>
             </Field>
             <Field label="CVSS v3.1 base" wide>
-              <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} disabled={!canWrite} />
+              <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} />
             </Field>
             <Field label="CWE">
               <input className="mono" value={form.cwe} onChange={set("cwe")} placeholder="CWE-79" />
@@ -155,7 +152,7 @@ function Editor({ finding }: { finding: Finding | null }) {
             <Field label="References" wide hint="One per line">
               <textarea rows={3} className="mono" value={form.references} onChange={set("references")} />
             </Field>
-          </fieldset>
+          </div>
         </Card>
         <div className="stack">
           <Card title={`Affected assets (${targetIds.length})`}>
@@ -166,7 +163,6 @@ function Editor({ finding }: { finding: Finding | null }) {
                 <label key={t.id} className="check">
                   <input
                     type="checkbox"
-                    disabled={!canWrite}
                     checked={targetIds.includes(t.id)}
                     onChange={(e) => setTargetIds(e.target.checked ? [...targetIds, t.id] : targetIds.filter((x) => x !== t.id))}
                   />
@@ -181,14 +177,12 @@ function Editor({ finding }: { finding: Finding | null }) {
             <Card title="Record">
               <dl className="dl small">
                 <dt>Source</dt><dd>{finding.source}</dd>
-                <dt>Created</dt><dd>{fmtDateTime(finding.created_at)}{finding.created_by && ` by ${finding.created_by.full_name}`}</dd>
+                <dt>Created</dt><dd>{fmtDateTime(finding.created_at)}</dd>
                 <dt>Updated</dt><dd>{fmtDateTime(finding.updated_at)}</dd>
               </dl>
-              {canWrite && (
-                <ConfirmButton variant="danger" size="sm" message={`Delete ${finding.ref}? Linked evidence is kept but unlinked.`} onConfirm={() => remove.mutate(undefined)}>
-                  Delete finding
-                </ConfirmButton>
-              )}
+              <ConfirmButton variant="danger" size="sm" message={`Delete ${finding.ref}? Linked evidence is kept but unlinked.`} onConfirm={() => remove.mutate(undefined)}>
+                Delete finding
+              </ConfirmButton>
             </Card>
           )}
           <p className="muted small">Findings in Draft or False positive status are left out of the {engagement.code} report.</p>
@@ -199,25 +193,20 @@ function Editor({ finding }: { finding: Finding | null }) {
 }
 
 function EvidencePanel({ finding }: { finding: Finding }) {
-  const { base, canWrite } = useEngagement();
+  const { base } = useEngagement();
   const key = [base, "evidence", { finding: finding.id }];
   const q = useQuery({ queryKey: key, queryFn: () => api.get<Evidence[]>(`${base}/evidence?finding_id=${finding.id}`) });
   const input = useRef<HTMLInputElement>(null);
   const [pasting, setPasting] = useState(false);
+  const [preview, setPreview] = useState<number | null>(null);
   const [text, setText] = useState({ filename: "request-response.txt", content: "", description: "" });
   const invalidate = [key, [base, "evidence"], [base, "findings"], [base, "finding", String(finding.id)]];
 
-  const upload = useApiMutation(
-    async (files: FileList) => {
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("finding_id", String(finding.id));
-        await api.post(`${base}/evidence`, fd);
-      }
-    },
-    { invalidate, success: "Evidence uploaded", onSuccess: () => input.current && (input.current.value = "") },
-  );
+  const upload = useApiMutation((files: FileList) => uploadEvidence(base, files, { finding_id: finding.id }), {
+    invalidate,
+    success: "Evidence uploaded",
+    onSuccess: () => input.current && (input.current.value = ""),
+  });
   const paste = useApiMutation(() => api.post(`${base}/evidence/text`, { ...text, finding_id: finding.id }), {
     invalidate,
     success: "Evidence saved",
@@ -227,6 +216,7 @@ function EvidencePanel({ finding }: { finding: Finding }) {
     },
   });
   const unlink = useApiMutation((id: number) => api.patch(`${base}/evidence/${id}`, { finding_id: null }), { invalidate });
+  const images = (q.data ?? []).filter((e) => e.is_image);
 
   return (
     <Card title={`Evidence (${q.data?.length ?? 0})`}>
@@ -234,38 +224,35 @@ function EvidencePanel({ finding }: { finding: Finding }) {
         {q.data?.map((e) => (
           <div key={e.id} className="evidence-item">
             {e.is_image ? (
-              <a href={`${base}/evidence/${e.id}/download?inline=true`} target="_blank" rel="noreferrer">
-                <img src={`${base}/evidence/${e.id}/download?inline=true`} alt={e.filename} />
-              </a>
+              <button type="button" className="thumb-btn" onClick={() => setPreview(images.indexOf(e))} title="Preview">
+                <img src={evidenceUrl(base, e, true)} alt={e.filename} />
+              </button>
             ) : (
               <div className="file-icon">{e.filename.split(".").pop()?.toUpperCase().slice(0, 4)}</div>
             )}
             <div className="evidence-meta">
-              <a href={`${base}/evidence/${e.id}/download`} className="strong small">{e.filename}</a>
+              <a href={evidenceUrl(base, e)} download className="strong small">{e.filename}</a>
               <div className="muted small">{fmtBytes(e.size)} · <span className="mono" title={e.sha256}>{e.sha256.slice(0, 12)}</span></div>
               {e.description && <div className="small">{e.description}</div>}
             </div>
-            {canWrite && <button className="link small" onClick={() => unlink.mutate(e.id)}>Unlink</button>}
+            <button className="link small" onClick={() => unlink.mutate(e.id)}>Unlink</button>
           </div>
         ))}
       </div>
-      {canWrite && (
-        <>
-          <div className="actions">
-            <input ref={input} type="file" multiple hidden onChange={(e) => e.target.files?.length && upload.mutate(e.target.files)} />
-            <Button size="sm" loading={upload.isPending} onClick={() => input.current?.click()}>Upload files</Button>
-            <Button size="sm" variant="ghost" onClick={() => setPasting(!pasting)}>Paste text</Button>
-          </div>
-          {pasting && (
-            <div className="form-grid single">
-              <Field label="File name"><input value={text.filename} onChange={(e) => setText({ ...text, filename: e.target.value })} /></Field>
-              <Field label="Content"><textarea rows={6} className="mono" value={text.content} onChange={(e) => setText({ ...text, content: e.target.value })} placeholder="Paste HTTP request/response, tool output..." /></Field>
-              <Field label="Description"><input value={text.description} onChange={(e) => setText({ ...text, description: e.target.value })} /></Field>
-              <Button size="sm" variant="primary" disabled={!text.content} loading={paste.isPending} onClick={() => paste.mutate(undefined)}>Save evidence</Button>
-            </div>
-          )}
-        </>
+      <div className="actions">
+        <input ref={input} type="file" multiple hidden onChange={(e) => e.target.files?.length && upload.mutate(e.target.files)} />
+        <Button size="sm" loading={upload.isPending} onClick={() => input.current?.click()}>Upload files</Button>
+        <Button size="sm" variant="ghost" onClick={() => setPasting(!pasting)}>Paste text</Button>
+      </div>
+      {pasting && (
+        <div className="form-grid single">
+          <Field label="File name"><input value={text.filename} onChange={(e) => setText({ ...text, filename: e.target.value })} /></Field>
+          <Field label="Content"><textarea rows={6} className="mono" value={text.content} onChange={(e) => setText({ ...text, content: e.target.value })} placeholder="Paste HTTP request/response, tool output..." /></Field>
+          <Field label="Description"><input value={text.description} onChange={(e) => setText({ ...text, description: e.target.value })} /></Field>
+          <Button size="sm" variant="primary" disabled={!text.content} loading={paste.isPending} onClick={() => paste.mutate(undefined)}>Save evidence</Button>
+        </div>
       )}
+      {preview !== null && <Lightbox images={evidenceImages(base, images)} start={preview} onClose={() => setPreview(null)} />}
     </Card>
   );
 }

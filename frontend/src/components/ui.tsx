@@ -8,6 +8,7 @@ import {
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
+import { ApiError } from "../api";
 import { FINDING_STATUSES, TEST_STATUSES, titleCase } from "../lib/format";
 import type { FindingStatus, ScopeStatus, Severity, TestStatus } from "../types";
 
@@ -50,6 +51,21 @@ export function ConfirmButton({
     >
       {children}
     </Button>
+  );
+}
+
+export function Logo() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden>
+      <path
+        d="M16 4 6 8.5v6.7c0 6.5 4.2 11.3 10 13 5.8-1.7 10-6.5 10-13V8.5z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="15" r="3.4" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -275,20 +291,95 @@ export function SeverityCounts({ counts }: { counts: Partial<Record<Severity, nu
   );
 }
 
-export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false);
+export function CopyButton({
+  text,
+  label = "Copy",
+  variant = "ghost",
+}: {
+  text: string;
+  label?: string;
+  variant?: Variant;
+}) {
+  const [result, setResult] = useState<"Copied" | "Copy failed" | null>(null);
   return (
     <Button
       size="sm"
-      variant="ghost"
+      variant={variant}
       onClick={async () => {
-        await navigator.clipboard.writeText(text);
-        setDone(true);
-        setTimeout(() => setDone(false), 1500);
+        try {
+          await navigator.clipboard.writeText(text);
+          setResult("Copied");
+        } catch {
+          setResult("Copy failed");
+        }
+        setTimeout(() => setResult(null), 1500);
       }}
     >
-      {done ? "Copied" : label}
+      {result ?? label}
     </Button>
+  );
+}
+
+export interface LightboxImage {
+  src: string;
+  title: string;
+  caption?: string;
+  /** Download URL for the original file. */
+  href?: string;
+}
+
+/**
+ * In-app image viewer. Evidence must never open in a new window: the desktop
+ * webview hands target="_blank" links to the system browser, which has no session.
+ */
+export function Lightbox({ images, start, onClose }: { images: LightboxImage[]; start: number; onClose: () => void }) {
+  const [index, setIndex] = useState(start);
+  const count = images.length;
+  const step = useCallback((d: number) => setIndex((i) => (i + d + count) % count), [count]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") step(1);
+      else if (e.key === "ArrowLeft") step(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, step]);
+  const img = images[index];
+  if (!img) return null;
+  return (
+    <div className="lightbox" role="dialog" aria-modal aria-label={img.title} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <img src={img.src} alt={img.title} />
+      <div className="lightbox-bar">
+        <div className="lightbox-title">
+          <strong>{img.title}</strong>
+          {img.caption && <span className="muted"> · {img.caption}</span>}
+        </div>
+        <div className="actions">
+          {count > 1 && (
+            <>
+              <Button size="sm" onClick={() => step(-1)} aria-label="Previous image">
+                ←
+              </Button>
+              <span className="muted small">
+                {index + 1} / {count}
+              </span>
+              <Button size="sm" onClick={() => step(1)} aria-label="Next image">
+                →
+              </Button>
+            </>
+          )}
+          {img.href && (
+            <a className="btn btn-secondary btn-sm" href={img.href} download>
+              Download
+            </a>
+          )}
+          <Button size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -343,6 +434,10 @@ export function useApiMutation<TVars, TData = unknown>(
       if (opts.success) toast("success", typeof opts.success === "function" ? opts.success(data) : opts.success);
       opts.onSuccess?.(data, vars);
     },
-    onError: (err) => toast("error", err instanceof Error ? err.message : String(err)),
+    onError: (err) => {
+      // 423 and 401 get a full-screen explanation from the VaultGate instead.
+      if (err instanceof ApiError && (err.status === 423 || err.status === 401)) return;
+      toast("error", err instanceof Error ? err.message : String(err));
+    },
   });
 }

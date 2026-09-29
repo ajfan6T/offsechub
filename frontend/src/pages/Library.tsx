@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api";
-import { canLead, useUser } from "../auth";
 import { CvssBuilder } from "../components/CvssBuilder";
 import {
   Button,
@@ -19,7 +18,6 @@ import { SEVERITIES, titleCase } from "../lib/format";
 import type { FindingTemplate, Severity } from "../types";
 
 export function Library() {
-  const user = useUser();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<FindingTemplate | "new" | null>(null);
   const q = useQuery({
@@ -36,11 +34,9 @@ export function Library() {
         title="Finding library"
         subtitle="Reusable, reviewed write-ups. Consistent wording across reports and far less time writing."
         actions={
-          canLead(user) && (
-            <Button variant="primary" onClick={() => setEditing("new")}>
-              New template
-            </Button>
-          )
+          <Button variant="primary" onClick={() => setEditing("new")}>
+            New template
+          </Button>
         }
       />
       <div className="toolbar">
@@ -73,7 +69,7 @@ export function Library() {
                     <SeverityBadge severity={t.severity} score={t.cvss_score} />
                   </td>
                   <td className="mono">{t.cwe || "-"}</td>
-                  <td className="right muted small">{canLead(user) ? "Edit" : "View"}</td>
+                  <td className="right muted small">Edit</td>
                 </tr>
               ))}
             </tbody>
@@ -81,25 +77,13 @@ export function Library() {
         )}
       </Card>
       {editing && (
-        <TemplateForm
-          template={editing === "new" ? null : editing}
-          readOnly={!canLead(user)}
-          onClose={() => setEditing(null)}
-        />
+        <TemplateForm template={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
       )}
     </>
   );
 }
 
-function TemplateForm({
-  template,
-  readOnly,
-  onClose,
-}: {
-  template: FindingTemplate | null;
-  readOnly: boolean;
-  onClose: () => void;
-}) {
+function TemplateForm({ template, onClose }: { template: FindingTemplate | null; onClose: () => void }) {
   const [form, setForm] = useState({
     title: template?.title ?? "",
     category: template?.category ?? "Web Application",
@@ -131,28 +115,24 @@ function TemplateForm({
       onClose={onClose}
       wide
       footer={
-        readOnly ? (
-          <Button onClick={onClose}>Close</Button>
-        ) : (
-          <>
-            {template && (
-              <Button
-                variant="danger"
-                className="mr-auto"
-                onClick={() => window.confirm("Delete this template?") && remove.mutate(undefined)}
-              >
-                Delete
-              </Button>
-            )}
-            <Button onClick={onClose}>Cancel</Button>
-            <Button variant="primary" loading={save.isPending} disabled={!form.title} onClick={() => save.mutate(undefined)}>
-              Save
+        <>
+          {template && (
+            <Button
+              variant="danger"
+              className="mr-auto"
+              onClick={() => window.confirm("Delete this template?") && remove.mutate(undefined)}
+            >
+              Delete
             </Button>
-          </>
-        )
+          )}
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!form.title} onClick={() => save.mutate(undefined)}>
+            Save
+          </Button>
+        </>
       }
     >
-      <fieldset disabled={readOnly} className="form-grid">
+      <div className="form-grid">
         <Field label="Title" wide>
           <input value={form.title} onChange={set("title")} />
         </Field>
@@ -177,7 +157,7 @@ function TemplateForm({
           <input className="mono" value={form.cwe} onChange={set("cwe")} placeholder="CWE-79" />
         </Field>
         <Field label="CVSS v3.1" wide>
-          <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} disabled={readOnly} />
+          <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} />
         </Field>
         <Field label="Description" wide>
           <textarea rows={4} value={form.description} onChange={set("description")} />
@@ -191,7 +171,7 @@ function TemplateForm({
         <Field label="References" wide hint="One per line">
           <textarea rows={3} className="mono" value={form.references} onChange={set("references")} />
         </Field>
-      </fieldset>
+      </div>
     </Modal>
   );
 }

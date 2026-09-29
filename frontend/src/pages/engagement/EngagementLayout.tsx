@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, Outlet, useParams } from "react-router";
 import { api } from "../../api";
-import { useUser } from "../../auth";
 import { ErrorBox, Loading, StatusPill } from "../../components/ui";
 import { daysUntil, ENGAGEMENT_TYPES, fmtDate } from "../../lib/format";
 import type { Engagement } from "../../types";
-import { permissions, type EngagementCtx } from "./context";
+import type { EngagementCtx } from "./context";
 
 const TABS = [
   { to: "", label: "Overview", end: true },
@@ -22,14 +21,13 @@ const TABS = [
 
 export function EngagementLayout() {
   const { engagementId } = useParams();
-  const user = useUser();
   const base = `/api/engagements/${engagementId}`;
   const q = useQuery({ queryKey: [base], queryFn: () => api.get<Engagement>(base) });
 
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error ?? "Engagement not found"} />;
   const e = q.data;
-  const ctx: EngagementCtx = { engagement: e, base, ...permissions(e, user) };
+  const ctx: EngagementCtx = { engagement: e, base };
   const left = daysUntil(e.end_date);
 
   return (
@@ -41,7 +39,6 @@ export function EngagementLayout() {
         <div className="eng-title">
           <h1>{e.name}</h1>
           <StatusPill status={e.status} />
-          {!ctx.canWrite && <span className="badge badge-muted">Read-only</span>}
         </div>
         <div className="muted">
           {e.client.name} · {ENGAGEMENT_TYPES[e.type]} · {fmtDate(e.start_date)} to {fmtDate(e.end_date)}

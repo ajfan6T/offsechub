@@ -2,23 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../../api";
-import { useUser } from "../../auth";
 import { Button, Card, Empty, Field, Loading, Modal, useApiMutation } from "../../components/ui";
 import { TEST_STATUSES } from "../../lib/format";
 import type { Methodology, TestCase, TestStatus } from "../../types";
-import { useEngagement, useMembers, useTargets } from "./context";
+import { useEngagement, useTargets } from "./context";
 
 export function Testing() {
-  const { base, canWrite } = useEngagement();
-  const user = useUser();
+  const { base } = useEngagement();
   const navigate = useNavigate();
   const tests = useQuery({ queryKey: [base, "tests"], queryFn: () => api.get<TestCase[]>(`${base}/tests`) });
   const methods = useQuery({ queryKey: ["methodologies"], queryFn: () => api.get<Methodology[]>("/api/methodologies") });
-  const members = useMembers(base);
   const targets = useTargets(base);
   const [methodology, setMethodology] = useState("");
   const [applyTarget, setApplyTarget] = useState("");
-  const [filter, setFilter] = useState({ status: "", mine: false, methodology: "" });
+  const [filter, setFilter] = useState({ status: "", methodology: "" });
   const [expanded, setExpanded] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const invalidate = [[base, "tests"], [base, "summary"], ["dashboard"]];
@@ -37,7 +34,6 @@ export function Testing() {
   const rows = (tests.data ?? []).filter(
     (t) =>
       (!filter.status || t.status === filter.status) &&
-      (!filter.mine || t.assignee?.id === user.id) &&
       (!filter.methodology || t.methodology === filter.methodology),
   );
   const groups = new Map<string, Map<string, TestCase[]>>();
@@ -76,32 +72,30 @@ export function Testing() {
             </>
           )}
         </Card>
-        {canWrite && (
-          <Card title="Apply methodology">
-            <div className="form-grid single">
-              <Field label="Checklist">
-                <select value={methodology} onChange={(e) => setMethodology(e.target.value)}>
-                  <option value="">Choose...</option>
-                  {methods.data?.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.case_count})</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="For a specific target (optional)" hint="Apply once per web app or host to track each separately">
-                <select value={applyTarget} onChange={(e) => setApplyTarget(e.target.value)}>
-                  <option value="">Whole engagement</option>
-                  {targets.data?.filter((t) => t.scope_status === "in_scope").map((t) => (
-                    <option key={t.id} value={t.id}>{t.value}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <div className="actions">
-              <Button variant="primary" disabled={!methodology} loading={apply.isPending} onClick={() => apply.mutate(undefined)}>Apply</Button>
-              <Button onClick={() => setAdding(true)}>Custom check</Button>
-            </div>
-          </Card>
-        )}
+        <Card title="Apply methodology">
+          <div className="form-grid single">
+            <Field label="Checklist">
+              <select value={methodology} onChange={(e) => setMethodology(e.target.value)}>
+                <option value="">Choose...</option>
+                {methods.data?.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name} ({m.case_count})</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="For a specific target (optional)" hint="Apply once per web app or host to track each separately">
+              <select value={applyTarget} onChange={(e) => setApplyTarget(e.target.value)}>
+                <option value="">Whole engagement</option>
+                {targets.data?.filter((t) => t.scope_status === "in_scope").map((t) => (
+                  <option key={t.id} value={t.id}>{t.value}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="actions">
+            <Button variant="primary" disabled={!methodology} loading={apply.isPending} onClick={() => apply.mutate(undefined)}>Apply</Button>
+            <Button onClick={() => setAdding(true)}>Custom check</Button>
+          </div>
+        </Card>
       </div>
 
       <div className="toolbar">
@@ -109,9 +103,6 @@ export function Testing() {
           <option value="">All checklists</option>
           {[...new Set(tests.data?.map((t) => t.methodology))].map((m) => <option key={m} value={m}>{methodName(m)}</option>)}
         </select>
-        <label className="check">
-          <input type="checkbox" checked={filter.mine} onChange={(e) => setFilter({ ...filter, mine: e.target.checked })} /> Assigned to me
-        </label>
         {filter.status && <Button size="sm" variant="ghost" onClick={() => setFilter({ ...filter, status: "" })}>Clear status filter</Button>}
       </div>
 
@@ -132,7 +123,6 @@ export function Testing() {
                       <col className="c-ref" />
                       <col />
                       <col className="c-status" />
-                      <col className="c-who" />
                       <col className="c-act" />
                     </colgroup>
                     <tbody>
@@ -142,8 +132,6 @@ export function Testing() {
                           t={t}
                           expanded={expanded === t.id}
                           onToggle={() => setExpanded(expanded === t.id ? null : t.id)}
-                          canWrite={canWrite}
-                          members={members.data?.map((x) => x.user) ?? []}
                           onPatch={(patch) => update.mutate({ id: t.id, patch })}
                           onRaise={() => navigate(`../findings/new?test=${t.id}&title=${encodeURIComponent(t.title)}${t.target_id ? `&target=${t.target_id}` : ""}`)}
                           onOpenFinding={() => navigate(`../findings/${t.finding_id}`)}
@@ -166,8 +154,6 @@ function TestRow({
   t,
   expanded,
   onToggle,
-  canWrite,
-  members,
   onPatch,
   onRaise,
   onOpenFinding,
@@ -175,8 +161,6 @@ function TestRow({
   t: TestCase;
   expanded: boolean;
   onToggle: () => void;
-  canWrite: boolean;
-  members: { id: number; full_name: string }[];
   onPatch: (p: Record<string, unknown>) => void;
   onRaise: () => void;
   onOpenFinding: () => void;
@@ -191,31 +175,25 @@ function TestRow({
           {t.notes && !expanded && <div className="muted small clamp">{t.notes}</div>}
         </td>
         <td className="nowrap">
-          <select value={t.status} disabled={!canWrite} className={`status-select s-${t.status}`} onChange={(e) => onPatch({ status: e.target.value })}>
+          <select value={t.status} className={`status-select s-${t.status}`} onChange={(e) => onPatch({ status: e.target.value })}>
             {Object.entries(TEST_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </td>
-        <td className="nowrap">
-          <select value={t.assignee?.id ?? ""} disabled={!canWrite} onChange={(e) => onPatch({ assignee_id: e.target.value ? Number(e.target.value) : null })}>
-            <option value="">Unassigned</option>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
           </select>
         </td>
         <td className="right nowrap">
           {t.finding_id ? (
             <Button size="sm" variant="ghost" onClick={onOpenFinding}>View finding</Button>
           ) : (
-            canWrite && t.status === "failed" && <Button size="sm" onClick={onRaise}>Raise finding</Button>
+            t.status === "failed" && <Button size="sm" onClick={onRaise}>Raise finding</Button>
           )}
         </td>
       </tr>
       {expanded && (
         <tr className="t-detail">
           <td />
-          <td colSpan={4}>
+          <td colSpan={3}>
             {t.description && <p className="muted">{t.description}</p>}
-            <textarea rows={3} placeholder="Notes: what you tried, payloads, why it passed..." value={notes} disabled={!canWrite} onChange={(e) => setNotes(e.target.value)} />
-            {canWrite && notes !== t.notes && <Button size="sm" variant="primary" onClick={() => onPatch({ notes })}>Save notes</Button>}
+            <textarea rows={3} placeholder="Notes: what you tried, payloads, why it passed..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+            {notes !== t.notes && <Button size="sm" variant="primary" onClick={() => onPatch({ notes })}>Save notes</Button>}
           </td>
         </tr>
       )}

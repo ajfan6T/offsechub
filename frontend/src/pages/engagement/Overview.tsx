@@ -12,13 +12,12 @@ import {
   useApiMutation,
 } from "../../components/ui";
 import { ENGAGEMENT_STATUSES, ENGAGEMENT_TYPES, SEVERITIES, TEST_STATUSES, titleCase } from "../../lib/format";
-import type { Engagement, EngagementSummary, MemberRole, TestStatus, UserBrief } from "../../types";
-import { useEngagement, useMembers } from "./context";
 import { useNavigate } from "react-router";
-import { useUser } from "../../auth";
+import type { Engagement, EngagementSummary, TestStatus } from "../../types";
+import { useEngagement } from "./context";
 
 export function Overview() {
-  const { engagement: e, base, canManage } = useEngagement();
+  const { engagement: e, base } = useEngagement();
   const summary = useQuery({ queryKey: [base, "summary"], queryFn: () => api.get<EngagementSummary>(`${base}/summary`) });
   const s = summary.data;
 
@@ -38,11 +37,10 @@ export function Overview() {
         <div className="stack">
           {s ? <FindingsCard s={s} /> : <Loading />}
           {s && <TestingCard s={s} />}
-          <TeamCard />
         </div>
         <div className="stack">
           <DetailsCard key={e.updated_at} />
-          {canManage && <DangerCard />}
+          <DangerCard />
         </div>
       </div>
     </>
@@ -96,7 +94,7 @@ function TestingCard({ s }: { s: EngagementSummary }) {
 }
 
 function DetailsCard() {
-  const { engagement: e, base, canManage } = useEngagement();
+  const { engagement: e, base } = useEngagement();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: e.name,
@@ -168,11 +166,9 @@ function DetailsCard() {
     <Card
       title="Engagement details"
       actions={
-        canManage && (
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        )
+        <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
       }
     >
       <dl className="dl">
@@ -180,17 +176,13 @@ function DetailsCard() {
         <dd>{e.client.name}</dd>
         <dt>Status</dt>
         <dd>
-          {canManage ? (
-            <select value={e.status} onChange={(ev) => setStatus.mutate(ev.target.value)}>
-              {ENGAGEMENT_STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {titleCase(st)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            titleCase(e.status)
-          )}
+          <select value={e.status} onChange={(ev) => setStatus.mutate(ev.target.value)}>
+            {ENGAGEMENT_STATUSES.map((st) => (
+              <option key={st} value={st}>
+                {titleCase(st)}
+              </option>
+            ))}
+          </select>
         </dd>
         <dt>Reference</dt>
         <dd className="mono">{e.code}</dd>
@@ -203,100 +195,19 @@ function DetailsCard() {
   );
 }
 
-function TeamCard() {
-  const { base, canManage } = useEngagement();
-  const members = useMembers(base);
-  const directory = useQuery({
-    queryKey: ["directory"],
-    queryFn: () => api.get<UserBrief[]>("/api/users/directory"),
-    enabled: canManage,
-  });
-  const [userId, setUserId] = useState("");
-  const [role, setRole] = useState<MemberRole>("tester");
-  const upsert = useApiMutation((vars: { user_id: number; role: MemberRole }) => api.put(`${base}/members`, vars), {
-    invalidate: [[base, "members"]],
-    success: "Team updated",
-    onSuccess: () => setUserId(""),
-  });
-  const remove = useApiMutation((uid: number) => api.del(`${base}/members/${uid}`), {
-    invalidate: [[base, "members"]],
-    success: "Member removed",
-  });
-  const memberIds = new Set(members.data?.map((m) => m.user.id));
-
-  return (
-    <Card title="Team">
-      <table className="table">
-        <tbody>
-          {members.data?.map((m) => (
-            <tr key={m.user.id}>
-              <td>
-                <strong>{m.user.full_name}</strong>
-                <div className="muted small">{m.user.email}</div>
-              </td>
-              <td>
-                {canManage ? (
-                  <select value={m.role} onChange={(ev) => upsert.mutate({ user_id: m.user.id, role: ev.target.value as MemberRole })}>
-                    <option value="lead">lead</option>
-                    <option value="tester">tester</option>
-                    <option value="viewer">viewer</option>
-                  </select>
-                ) : (
-                  m.role
-                )}
-              </td>
-              <td className="right">
-                {canManage && (
-                  <ConfirmButton size="sm" variant="ghost" message={`Remove ${m.user.full_name}?`} onConfirm={() => remove.mutate(m.user.id)}>
-                    Remove
-                  </ConfirmButton>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {canManage && (
-        <div className="inline-form">
-          <select value={userId} onChange={(ev) => setUserId(ev.target.value)}>
-            <option value="">Add a team member...</option>
-            {directory.data
-              ?.filter((u) => !memberIds.has(u.id))
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name} ({u.email})
-                </option>
-              ))}
-          </select>
-          <select value={role} onChange={(ev) => setRole(ev.target.value as MemberRole)}>
-            <option value="tester">tester</option>
-            <option value="lead">lead</option>
-            <option value="viewer">viewer</option>
-          </select>
-          <Button disabled={!userId} onClick={() => upsert.mutate({ user_id: Number(userId), role })}>
-            Add
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
 function DangerCard() {
   const { engagement: e, base } = useEngagement();
-  const user = useUser();
   const navigate = useNavigate();
   const del = useApiMutation(() => api.del(base), {
     invalidate: [["engagements"], ["dashboard"]],
     success: `Deleted ${e.code}`,
     onSuccess: () => navigate("/engagements"),
   });
-  if (user.role !== "admin") return null;
   return (
     <Card title="Data retention">
       <p className="muted small">
-        Deleting an engagement permanently removes its targets, findings, evidence files and op log. The audit trail
-        keeps a record of the deletion.
+        Deleting an engagement permanently removes its targets, findings, op log and evidence files. The activity log keeps
+        a record of the deletion.
       </p>
       <ConfirmButton
         variant="danger"

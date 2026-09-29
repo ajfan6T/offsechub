@@ -1,13 +1,11 @@
+"""API request and response models (single operator: no user references)."""
+
 import re
 from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .security import MIN_PASSWORD_LENGTH
-
-Role = Literal["admin", "lead", "tester", "viewer"]
-MemberRole = Literal["lead", "tester", "viewer"]
 EngagementType = Literal[
     "external_network",
     "internal_network",
@@ -39,96 +37,11 @@ SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 # Findings in these states appear in client-facing reports.
 REPORTABLE_STATUSES = ("confirmed", "reported", "remediated", "risk_accepted")
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,31}$")
 
 
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
-
-def _check_email(v: str) -> str:
-    v = v.strip().lower()
-    if not _EMAIL_RE.match(v):
-        raise ValueError("invalid email address")
-    return v
-
-
-def _check_password(v: str) -> str:
-    if len(v) < MIN_PASSWORD_LENGTH:
-        raise ValueError(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
-    return v
-
-
-# ----------------------------------------------------------------- users/auth
-
-
-class UserBrief(ORM):
-    id: int
-    full_name: str
-    email: str
-
-
-class UserOut(ORM):
-    id: int
-    email: str
-    full_name: str
-    role: Role
-    is_active: bool
-    created_at: datetime
-    last_login_at: datetime | None
-
-
-class UserCreate(BaseModel):
-    email: str
-    full_name: str = Field(min_length=1, max_length=255)
-    password: str
-    role: Role = "tester"
-
-    _email = field_validator("email")(_check_email)
-    _password = field_validator("password")(_check_password)
-
-
-class UserUpdate(BaseModel):
-    full_name: str | None = Field(default=None, min_length=1, max_length=255)
-    role: Role | None = None
-    is_active: bool | None = None
-    password: str | None = None
-
-    @field_validator("password")
-    @classmethod
-    def _pw(cls, v: str | None) -> str | None:
-        return None if v is None else _check_password(v)
-
-
-class LoginIn(BaseModel):
-    email: str
-    password: str
-
-
-class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str
-
-    _password = field_validator("new_password")(_check_password)
-
-
-class TokenCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    expires_in_days: int | None = Field(default=90, ge=1, le=365)
-
-
-class TokenOut(ORM):
-    id: int
-    name: str
-    kind: str
-    created_at: datetime
-    expires_at: datetime | None
-    last_used_at: datetime | None
-
-
-class TokenCreated(TokenOut):
-    token: str
 
 
 # -------------------------------------------------------------------- clients
@@ -215,19 +128,7 @@ class EngagementOut(ORM):
     executive_summary: str
     created_at: datetime
     updated_at: datetime
-    my_role: str | None = None
     finding_counts: dict[str, int] = {}
-
-
-class MemberIn(BaseModel):
-    user_id: int
-    role: MemberRole = "tester"
-
-
-class MemberOut(ORM):
-    user: UserBrief
-    role: MemberRole
-    added_at: datetime
 
 
 class EngagementSummary(BaseModel):
@@ -358,7 +259,6 @@ class ImportOut(ORM):
     evidence_id: int | None
     stats: dict
     created_at: datetime
-    created_by: UserBrief | None
 
 
 # -------------------------------------------------------------------- testing
@@ -385,7 +285,6 @@ class TestCaseIn(BaseModel):
     description: str = ""
     status: TestStatus = "not_started"
     notes: str = ""
-    assignee_id: int | None = None
     target_id: int | None = None
     finding_id: int | None = None
 
@@ -396,7 +295,6 @@ class TestCaseUpdate(BaseModel):
     description: str | None = None
     status: TestStatus | None = None
     notes: str | None = None
-    assignee_id: int | None = None
     target_id: int | None = None
     finding_id: int | None = None
 
@@ -410,7 +308,6 @@ class TestCaseOut(ORM):
     description: str
     status: TestStatus
     notes: str
-    assignee: UserBrief | None
     target_id: int | None
     finding_id: int | None
     updated_at: datetime
@@ -429,7 +326,6 @@ class EvidenceOut(ORM):
     finding_id: int | None
     target_id: int | None
     test_case_id: int | None
-    uploaded_by: UserBrief | None
     created_at: datetime
     is_image: bool = False
 
@@ -500,7 +396,6 @@ class FindingOut(ORM):
     source: str
     targets: list[TargetBrief]
     evidence_count: int = 0
-    created_by: UserBrief | None
     created_at: datetime
     updated_at: datetime
 
@@ -554,11 +449,14 @@ class CvssOut(BaseModel):
     metrics: dict[str, str]
 
 
-# ------------------------------------------------------------- op log / audit
+# ---------------------------------------------------------- op log / activity
 
 
 class OplogIn(BaseModel):
     occurred_at: datetime | None = None
+    # Defaults to the profile name. Stored per entry, so an exported log stays
+    # accurate after the profile changes (or when logging for a colleague).
+    operator: str | None = Field(default=None, max_length=255)
     source_host: str = ""
     target: str = ""
     tool: str = ""
@@ -570,25 +468,23 @@ class OplogIn(BaseModel):
 class OplogOut(ORM):
     id: int
     occurred_at: datetime
+    operator: str
     source_host: str
     target: str
     tool: str
     command: str
     description: str
     outcome: OplogOutcome
-    user: UserBrief | None
     created_at: datetime
 
 
-class AuditOut(ORM):
+class ActivityOut(ORM):
     id: int
-    user: UserBrief | None
     engagement_id: int | None
     action: str
     entity_type: str
     entity_id: int | None
     summary: str
-    ip_address: str
     created_at: datetime
 
 
@@ -598,6 +494,6 @@ class AuditOut(ORM):
 class DashboardOut(BaseModel):
     engagements_by_status: dict[str, int]
     open_findings_by_severity: dict[str, int]
-    my_open_tests: int
+    open_tests: int  # not started, in progress or blocked, across active engagements
     active_engagements: list[EngagementOut]
     recent_findings: list[dict]

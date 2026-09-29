@@ -8,7 +8,6 @@ import {
   Card,
   Empty,
   ErrorBox,
-  FindingStatusBadge,
   Loading,
   Modal,
   SeverityBadge,
@@ -19,7 +18,7 @@ import type { Finding, FindingStatus, FindingTemplate, Severity } from "../../ty
 import { useEngagement, useFindings } from "./context";
 
 export function Findings() {
-  const { base, canWrite } = useEngagement();
+  const { base } = useEngagement();
   const q = useFindings(base);
   const navigate = useNavigate();
   const [severity, setSeverity] = useState<Severity | "">("");
@@ -64,12 +63,8 @@ export function Findings() {
             {drafts} to triage
           </Button>
         )}
-        {canWrite && (
-          <>
-            <Button onClick={() => setPicking(true)}>From library</Button>
-            <Button variant="primary" onClick={() => navigate("new")}>New finding</Button>
-          </>
-        )}
+        <Button onClick={() => setPicking(true)}>From library</Button>
+        <Button variant="primary" onClick={() => navigate("new")}>New finding</Button>
       </div>
       <Card>
         {q.isLoading ? (
@@ -107,13 +102,9 @@ export function Findings() {
                   </td>
                   <td className="small">{f.evidence_count || <span className="warn-text">none</span>}</td>
                   <td>
-                    {canWrite ? (
-                      <select value={f.status} onChange={(e) => patch.mutate({ id: f.id, status: e.target.value as FindingStatus })}>
-                        {Object.entries(FINDING_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                    ) : (
-                      <FindingStatusBadge status={f.status} />
-                    )}
+                    <select value={f.status} onChange={(e) => patch.mutate({ id: f.id, status: e.target.value as FindingStatus })}>
+                      {Object.entries(FINDING_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
                   </td>
                 </tr>
               ))}

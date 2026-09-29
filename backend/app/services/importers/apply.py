@@ -11,12 +11,10 @@ from .parsers import ParsedHost, ParseResult
 
 
 class ImportContext:
-    def __init__(self, db: Session, engagement: Engagement, tool: str, user_id: int | None,
-                 skip_out_of_scope: bool):
+    def __init__(self, db: Session, engagement: Engagement, tool: str, skip_out_of_scope: bool):
         self.db = db
         self.engagement = engagement
         self.tool = tool
-        self.user_id = user_id
         self.skip_out_of_scope = skip_out_of_scope
         self.matcher = ScopeMatcher(engagement.scope_items)
         self.targets: dict[str, Target] = {
@@ -133,7 +131,6 @@ def apply_result(ctx: ImportContext, parsed: ParseResult) -> dict:
                     steps_to_reproduce=issue.reproduction,
                     source=ctx.tool,
                     source_ref=issue.key,
-                    created_by_id=ctx.user_id,
                     targets=[],
                 )
                 if issue.cvss_vector:

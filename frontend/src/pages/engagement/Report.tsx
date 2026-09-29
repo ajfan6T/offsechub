@@ -13,7 +13,7 @@ interface Check {
 }
 
 export function Report() {
-  const { engagement: e, base, canManage } = useEngagement();
+  const { engagement: e, base } = useEngagement();
   const findings = useFindings(base);
   const tests = useQuery({ queryKey: [base, "tests"], queryFn: () => api.get<TestCase[]>(`${base}/tests`) });
   const [drafts, setDrafts] = useState(false);
@@ -69,32 +69,31 @@ export function Report() {
         </Card>
         <Card title="Executive summary">
           <Field label="Written for a non-technical reader: overall risk, key themes, top priorities">
-            <textarea rows={10} value={summary} disabled={!canManage} onChange={(ev) => setSummary(ev.target.value)} />
+            <textarea rows={10} value={summary} onChange={(ev) => setSummary(ev.target.value)} />
           </Field>
-          {canManage && (
-            <Button variant="primary" disabled={summary === e.executive_summary} loading={saveSummary.isPending} onClick={() => saveSummary.mutate(undefined)}>
-              Save summary
-            </Button>
-          )}
+          <Button variant="primary" disabled={summary === e.executive_summary} loading={saveSummary.isPending} onClick={() => saveSummary.mutate(undefined)}>
+            Save summary
+          </Button>
         </Card>
         <Card title="Export">
           <label className="check">
             <input type="checkbox" checked={drafts} onChange={(ev) => setDrafts(ev.target.checked)} /> Include draft findings (internal QA copy)
           </label>
           <div className="actions wrap">
-            <a className="btn btn-primary" href={url("html")} target="_blank" rel="noreferrer">Open printable HTML</a>
-            <a className="btn btn-secondary" href={url("html", true)}>Download HTML</a>
-            <a className="btn btn-secondary" href={url("md", true)}>Markdown</a>
-            <a className="btn btn-secondary" href={url("json", true)}>JSON</a>
+            <a className="btn btn-primary" href={url("html", true)} download>Save printable HTML</a>
+            <a className="btn btn-secondary" href={url("md", true)} download>Markdown</a>
+            <a className="btn btn-secondary" href={url("json", true)} download>JSON</a>
           </div>
           <p className="muted small">
-            For PDF, open the printable HTML and use your browser's Print → Save as PDF. {reportable.length} finding(s) will be
-            included. Every export is recorded in the audit log.
+            For a PDF, open the saved HTML file in your browser, then Print → Save as PDF. The file is self-contained (images
+            embedded, no scripts). {reportable.length} finding(s) will be included. Every export is recorded in the activity
+            log.
           </p>
         </Card>
       </div>
       <Card title="Preview" actions={<Button size="sm" variant="ghost" onClick={() => setNonce((n) => n + 1)}>Refresh</Button>}>
-        <iframe key={`${nonce}-${drafts}`} className="report-frame" title="Report preview" src={url("html")} sandbox="allow-same-origin" />
+        {/* Empty sandbox: the report runs with no scripts and an opaque origin, so it can never reach the API. */}
+        <iframe key={`${nonce}-${drafts}`} className="report-frame" title="Report preview" src={url("html")} sandbox="" />
       </Card>
     </div>
   );

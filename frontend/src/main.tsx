@@ -4,9 +4,9 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { ApiError } from "./api";
 import { App } from "./App";
-import { AuthProvider } from "./auth";
 import { ToastProvider } from "./components/ui";
 import "./styles.css";
+import { VaultGate } from "./vault/VaultGate";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,9 +23,9 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ToastProvider>
-          <AuthProvider>
+          <VaultGate>
             <App />
-          </AuthProvider>
+          </VaultGate>
         </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>

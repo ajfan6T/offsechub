@@ -1,12 +1,12 @@
 import ipaddress
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
-from ..deps import EngagementAccess, engagement_reader, engagement_writer, get_or_404
-from ..models import Service, Target, finding_targets
+from ..deps import get_engagement, get_or_404
+from ..models import Engagement, Service, Target, finding_targets
 from ..schemas import ServiceIn, ServiceOut, TargetIn, TargetOut, TargetUpdate
 from ..services import audit
 from ..services.scope import ScopeMatcher
@@ -39,11 +39,10 @@ def _clean_tags(tags: list[str]) -> list[str]:
 
 @router.get("", response_model=list[TargetOut])
 def list_targets(q: str | None = None, scope_status: str | None = None, kind: str | None = None,
-                 access: EngagementAccess = Depends(engagement_reader),
-                 db: Session = Depends(get_db)):
+                 eng: Engagement = Depends(get_engagement), db: Session = Depends(get_db)):
     stmt = (
         select(Target)
-        .where(Target.engagement_id == access.engagement.id)
+        .where(Target.engagement_id == eng.id)
         .options(selectinload(Target.services))
         .order_by(Target.value)
     )
@@ -58,7 +57,7 @@ def list_targets(q: str | None = None, scope_status: str | None = None, kind: st
             | func.lower(Target.os).like(like)
         )
     targets = db.scalars(stmt).all()
-    matcher = ScopeMatcher(access.engagement.scope_items)
+    matcher = ScopeMatcher(eng.scope_items)
     counts = _finding_counts(db, [t.id for t in targets])
     out = [target_out(t, matcher, counts.get(t.id, 0)) for t in targets]
     if scope_status:
@@ -67,10 +66,8 @@ def list_targets(q: str | None = None, scope_status: str | None = None, kind: st
 
 
 @router.post("", response_model=TargetOut, status_code=201)
-def create_target(body: TargetIn, request: Request,
-                  access: EngagementAccess = Depends(engagement_writer),
+def create_target(body: TargetIn, eng: Engagement = Depends(get_engagement),
                   db: Session = Depends(get_db)):
-    eng = access.engagement
     value = body.value.strip()
     if db.scalar(select(Target).where(Target.engagement_id == eng.id, Target.value == value)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Target already exists in this engagement")
@@ -84,51 +81,43 @@ def create_target(body: TargetIn, request: Request,
     target = Target(engagement_id=eng.id, source="manual", **data)
     db.add(target)
     db.flush()
-    matcher = ScopeMatcher(eng.scope_items)
-    out = target_out(target, matcher)
-    audit.record(db, user=access.user, action="create", entity_type="target", entity_id=target.id,
-                 engagement_id=eng.id, summary=f"Added target {value} ({out.scope_status})",
-                 request=request)
+    out = target_out(target, ScopeMatcher(eng.scope_items))
+    audit.record(db, action="create", entity_type="target", entity_id=target.id,
+                 engagement_id=eng.id, summary=f"Added target {value} ({out.scope_status})")
     db.commit()
     return out
 
 
 @router.get("/{target_id}", response_model=TargetOut)
-def get_target(target_id: int, access: EngagementAccess = Depends(engagement_reader),
+def get_target(target_id: int, eng: Engagement = Depends(get_engagement),
                db: Session = Depends(get_db)):
-    t = get_or_404(db, Target, target_id, access.engagement.id)
-    return target_out(t, ScopeMatcher(access.engagement.scope_items),
-                      _finding_counts(db, [t.id]).get(t.id, 0))
+    t = get_or_404(db, Target, target_id, eng.id)
+    return target_out(t, ScopeMatcher(eng.scope_items), _finding_counts(db, [t.id]).get(t.id, 0))
 
 
 @router.patch("/{target_id}", response_model=TargetOut)
-def update_target(target_id: int, body: TargetUpdate, request: Request,
-                  access: EngagementAccess = Depends(engagement_writer),
+def update_target(target_id: int, body: TargetUpdate, eng: Engagement = Depends(get_engagement),
                   db: Session = Depends(get_db)):
-    t = get_or_404(db, Target, target_id, access.engagement.id)
+    t = get_or_404(db, Target, target_id, eng.id)
     data = body.model_dump(exclude_unset=True, exclude_none=True)
     if "tags" in data:
         data["tags"] = _clean_tags(data["tags"])
     for k, v in data.items():
         setattr(t, k, v)
-    audit.record(db, user=access.user, action="update", entity_type="target", entity_id=t.id,
-                 engagement_id=access.engagement.id,
-                 summary=f"Updated target {t.value}: {', '.join(data) or 'nothing'}",
-                 request=request)
+    audit.record(db, action="update", entity_type="target", entity_id=t.id,
+                 engagement_id=eng.id,
+                 summary=f"Updated target {t.value}: {', '.join(data) or 'nothing'}")
     db.commit()
-    return target_out(t, ScopeMatcher(access.engagement.scope_items),
-                      _finding_counts(db, [t.id]).get(t.id, 0))
+    return target_out(t, ScopeMatcher(eng.scope_items), _finding_counts(db, [t.id]).get(t.id, 0))
 
 
 @router.delete("/{target_id}", status_code=204)
-def delete_target(target_id: int, request: Request,
-                  access: EngagementAccess = Depends(engagement_writer),
+def delete_target(target_id: int, eng: Engagement = Depends(get_engagement),
                   db: Session = Depends(get_db)):
-    t = get_or_404(db, Target, target_id, access.engagement.id)
+    t = get_or_404(db, Target, target_id, eng.id)
     db.delete(t)
-    audit.record(db, user=access.user, action="delete", entity_type="target", entity_id=target_id,
-                 engagement_id=access.engagement.id, summary=f"Deleted target {t.value}",
-                 request=request)
+    audit.record(db, action="delete", entity_type="target", entity_id=target_id,
+                 engagement_id=eng.id, summary=f"Deleted target {t.value}")
     db.commit()
 
 
@@ -136,24 +125,22 @@ def delete_target(target_id: int, request: Request,
 
 
 @router.post("/{target_id}/services", response_model=ServiceOut, status_code=201)
-def add_service(target_id: int, body: ServiceIn, request: Request,
-                access: EngagementAccess = Depends(engagement_writer),
+def add_service(target_id: int, body: ServiceIn, eng: Engagement = Depends(get_engagement),
                 db: Session = Depends(get_db)):
-    t = get_or_404(db, Target, target_id, access.engagement.id)
+    t = get_or_404(db, Target, target_id, eng.id)
     if any(s.port == body.port and s.protocol == body.protocol for s in t.services):
         raise HTTPException(status.HTTP_409_CONFLICT, "Service already recorded on this target")
     svc = Service(target_id=t.id, **body.model_dump())
     db.add(svc)
     db.flush()
-    audit.record(db, user=access.user, action="create", entity_type="service", entity_id=svc.id,
-                 engagement_id=access.engagement.id,
-                 summary=f"Added {body.port}/{body.protocol} to {t.value}", request=request)
+    audit.record(db, action="create", entity_type="service", entity_id=svc.id,
+                 engagement_id=eng.id, summary=f"Added {body.port}/{body.protocol} to {t.value}")
     db.commit()
     return svc
 
 
-def _service_or_404(db: Session, access: EngagementAccess, target_id: int, service_id: int) -> Service:
-    t = get_or_404(db, Target, target_id, access.engagement.id)
+def _service_or_404(db: Session, eng: Engagement, target_id: int, service_id: int) -> Service:
+    t = get_or_404(db, Target, target_id, eng.id)
     svc = db.get(Service, service_id)
     if svc is None or svc.target_id != t.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Service not found")
@@ -161,27 +148,24 @@ def _service_or_404(db: Session, access: EngagementAccess, target_id: int, servi
 
 
 @router.put("/{target_id}/services/{service_id}", response_model=ServiceOut)
-def update_service(target_id: int, service_id: int, body: ServiceIn, request: Request,
-                   access: EngagementAccess = Depends(engagement_writer),
-                   db: Session = Depends(get_db)):
-    svc = _service_or_404(db, access, target_id, service_id)
+def update_service(target_id: int, service_id: int, body: ServiceIn,
+                   eng: Engagement = Depends(get_engagement), db: Session = Depends(get_db)):
+    svc = _service_or_404(db, eng, target_id, service_id)
     for k, v in body.model_dump().items():
         setattr(svc, k, v)
-    audit.record(db, user=access.user, action="update", entity_type="service", entity_id=svc.id,
-                 engagement_id=access.engagement.id,
-                 summary=f"Updated {svc.port}/{svc.protocol} on {svc.target.value}", request=request)
+    audit.record(db, action="update", entity_type="service", entity_id=svc.id,
+                 engagement_id=eng.id,
+                 summary=f"Updated {svc.port}/{svc.protocol} on {svc.target.value}")
     db.commit()
     return svc
 
 
 @router.delete("/{target_id}/services/{service_id}", status_code=204)
-def delete_service(target_id: int, service_id: int, request: Request,
-                   access: EngagementAccess = Depends(engagement_writer),
+def delete_service(target_id: int, service_id: int, eng: Engagement = Depends(get_engagement),
                    db: Session = Depends(get_db)):
-    svc = _service_or_404(db, access, target_id, service_id)
+    svc = _service_or_404(db, eng, target_id, service_id)
     db.delete(svc)
-    audit.record(db, user=access.user, action="delete", entity_type="service", entity_id=service_id,
-                 engagement_id=access.engagement.id,
-                 summary=f"Removed {svc.port}/{svc.protocol} from {svc.target.value}",
-                 request=request)
+    audit.record(db, action="delete", entity_type="service", entity_id=service_id,
+                 engagement_id=eng.id,
+                 summary=f"Removed {svc.port}/{svc.protocol} from {svc.target.value}")
     db.commit()

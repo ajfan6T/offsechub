@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api } from "../api";
-import { useUser } from "../auth";
 import {
   Card,
   Empty,
@@ -16,9 +15,10 @@ import {
 } from "../components/ui";
 import { daysUntil, ENGAGEMENT_TYPES, fmtDate, fmtRelative, SEVERITIES } from "../lib/format";
 import type { Dashboard as DashboardData } from "../types";
+import { useProfile } from "../vault/context";
 
 export function Dashboard() {
-  const user = useUser();
+  const profile = useProfile();
   const q = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<DashboardData>("/api/dashboard") });
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} />;
@@ -27,16 +27,23 @@ export function Dashboard() {
   const openTotal = SEVERITIES.reduce((n, s) => n + (open[s] ?? 0), 0);
   const maxSev = Math.max(1, ...SEVERITIES.map((s) => open[s] ?? 0));
   const active = (d.engagements_by_status.active ?? 0) + (d.engagements_by_status.planning ?? 0);
+  const firstName = profile.data?.name.split(" ")[0];
 
   return (
     <>
-      <PageHeader title={`Welcome back, ${user.full_name.split(" ")[0]}`} subtitle="Your engagements at a glance" />
+      <PageHeader title={firstName ? `Welcome back, ${firstName}` : "Dashboard"} subtitle="Your engagements at a glance" />
+      {profile.data && !profile.data.name && (
+        <div className="alert alert-info">
+          <Link to="/settings">Add your name and organization</Link> in Settings. They appear on reports and sign your op-log
+          entries.
+        </div>
+      )}
       <div className="stats">
         <Stat label="Active & planned engagements" value={active} />
         <Stat label="In reporting / review" value={(d.engagements_by_status.reporting ?? 0) + (d.engagements_by_status.review ?? 0)} />
         <Stat label="Open findings" value={openTotal} hint="draft, confirmed or reported" />
         <Stat label="Critical + high open" value={(open.critical ?? 0) + (open.high ?? 0)} tone={(open.critical ?? 0) + (open.high ?? 0) ? "red" : undefined} />
-        <Stat label="My open test cases" value={d.my_open_tests} />
+        <Stat label="Open test cases" value={d.open_tests} hint="not started, in progress or blocked" />
       </div>
 
       <div className="grid-2-1">

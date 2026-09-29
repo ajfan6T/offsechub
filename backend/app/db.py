@@ -1,47 +1,49 @@
+"""SQLAlchemy base and the request → vault session dependency.
+
+There is no global engine: the only database is the in-memory SQLite of the
+currently unlocked vault (see app/vault/manager.py).
+"""
+
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from fastapi import Depends, HTTPException, Request
+from sqlalchemy.orm import DeclarativeBase, Session
 
-from .config import get_settings
+from .vault.manager import OpenVault, VaultLocked, VaultManager
 
 
 class Base(DeclarativeBase):
     pass
 
 
-def _make_engine(url: str) -> Engine:
-    connect_args = {}
-    if url.startswith("sqlite"):
-        connect_args["check_same_thread"] = False
-    engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
-    if url.startswith("sqlite"):
-
-        @event.listens_for(engine, "connect")
-        def _sqlite_pragmas(dbapi_conn, _record):  # pragma: no cover - driver hook
-            cur = dbapi_conn.cursor()
-            cur.execute("PRAGMA foreign_keys=ON")
-            cur.execute("PRAGMA journal_mode=WAL")
-            cur.close()
-
-    return engine
+LOCKED_DETAIL = "The vault is locked"
 
 
-engine = _make_engine(get_settings().database_url)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+def get_manager(request: Request) -> VaultManager:
+    return request.app.state.vaults
 
 
-def configure_engine(url: str) -> None:
-    """Rebind the global engine (used by tests and the CLI)."""
-    global engine
-    engine = _make_engine(url)
-    SessionLocal.configure(bind=engine)
-
-
-def get_db() -> Iterator[Session]:
-    db = SessionLocal()
+def get_vault(manager: VaultManager = Depends(get_manager)) -> OpenVault:
     try:
-        yield db
-    finally:
-        db.close()
+        return manager.require()
+    except VaultLocked:
+        raise HTTPException(423, LOCKED_DETAIL) from None
+
+
+def _vault_session(vault: OpenVault = Depends(get_vault)) -> Iterator[Session]:
+    try:
+        with vault.session() as session:
+            yield session
+    except VaultLocked:
+        raise HTTPException(423, LOCKED_DETAIL) from None
+
+
+def get_db(session: Session = Depends(_vault_session, scope="function")) -> Session:
+    """A session with exclusive access to the vault DB for the endpoint's duration.
+
+    ``scope="function"`` closes it (releasing the vault's DB lock) right after
+    the response is serialized but *before* it is sent, so the group-commit
+    middleware can wait for the save without deadlocking against it.
+    Never lock the vault (or call vault.save()) while holding this session.
+    """
+    return session

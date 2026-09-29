@@ -39,15 +39,7 @@ export function useCvssScore(vector: string) {
   });
 }
 
-export function CvssBuilder({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (vector: string) => void;
-  disabled?: boolean;
-}) {
+export function CvssBuilder({ value, onChange }: { value: string; onChange: (vector: string) => void }) {
   const [metrics, setMetrics] = useState<Record<string, string>>(() => parse(value));
   const [raw, setRaw] = useState(value);
   const score = useCvssScore(value);
@@ -75,7 +67,6 @@ export function CvssBuilder({
                 <button
                   type="button"
                   key={code}
-                  disabled={disabled}
                   className={metrics[m.key] === code ? "on" : ""}
                   onClick={() => pick(m.key, code)}
                 >
@@ -90,7 +81,6 @@ export function CvssBuilder({
         <input
           className="mono"
           value={raw}
-          disabled={disabled}
           placeholder="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
           onChange={(e) => setRaw(e.target.value)}
           onBlur={() => raw !== value && onChange(raw.trim())}
@@ -98,7 +88,7 @@ export function CvssBuilder({
         {value && score.data && <SeverityBadge severity={score.data.severity} score={score.data.score} />}
         {value && score.error && <span className="error-text">{(score.error as Error).message}</span>}
         {!value && <span className="muted small">Pick all eight metrics or paste a vector</span>}
-        {value && !disabled && (
+        {value && (
           <button type="button" className="link" onClick={() => onChange("")}>
             Clear
           </button>

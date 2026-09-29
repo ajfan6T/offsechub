@@ -1,11 +1,16 @@
 # {{ client.name }}: {{ engagement.name }}
 
 **{{ engagement.type }}** · Reference `{{ engagement.code }}`
+
 {% if engagement.start_date %}
-Testing window: {{ engagement.start_date }}{% if engagement.end_date %} to {{ engagement.end_date }}{% endif %}
+Testing window: {{ engagement.start_date }}{{ " to " ~ engagement.end_date if engagement.end_date else "" }}
 
 {% endif %}
-Generated {{ generated_at }} by {{ generated_by }}
+{% if prepared_by.name or prepared_by.organization %}
+Prepared by {{ [prepared_by.name, prepared_by.organization]|select|join(", ") }}
+
+{% endif %}
+Generated {{ generated_at }}
 {% if draft %}
 
 > **DRAFT** - not for distribution
@@ -140,7 +145,7 @@ _No methodology checklist was tracked for this engagement._
 _No findings were reported._
 {% endfor %}
 
-## Appendix: assets in scope
+## Appendix A: assets in scope
 
 {% if targets %}
 | Asset | Hostname | IP | OS | Services |
@@ -152,8 +157,31 @@ _No findings were reported._
 _No in-scope assets recorded._
 {% endif %}
 
-### Assessment team
+## Appendix B: evidence fingerprints
 
-{% for m in team %}
-- {{ m.name }} ({{ m.role }})
+SHA-256 fingerprints of the evidence attached to the findings in this report, recorded when each file was added.
+Recomputing a file's SHA-256 confirms it is the one referenced here.
+
+{% if evidence_fingerprints %}
+| Finding | File | Size | SHA-256 |
+|---|---|---|---|
+{% for e in evidence_fingerprints %}
+| {{ e.finding }} | {{ e.filename|cell }} | {{ e.size|bytes }} | `{{ e.sha256 }}` |
 {% endfor %}
+{% else %}
+_No evidence is attached to the reported findings._
+{% endif %}
+{% if prepared_by.name or prepared_by.organization or prepared_by.email %}
+
+### Prepared by
+
+{% if prepared_by.name %}
+- Name: {{ prepared_by.name }}
+{% endif %}
+{% if prepared_by.organization %}
+- Organization: {{ prepared_by.organization }}
+{% endif %}
+{% if prepared_by.email %}
+- Email: {{ prepared_by.email }}
+{% endif %}
+{% endif %}

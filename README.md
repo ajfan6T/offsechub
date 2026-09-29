@@ -1,160 +1,107 @@
 # OffsecHub
 
-OffsecHub is a workspace for offensive security teams. One engagement holds everything from the signed scope to the delivered report:
+**A local-first, encrypted workspace for penetration testers.** Scope, targets, recon imports, testing checklists, evidence, findings, operator logs and client-ready reports, all in **one encrypted vault on your own disk**. No server, no account, no network.
 
-**case management → scope → targets → recon → testing → evidence → findings → reporting**
+> A portfolio project in security engineering. The interesting parts are the [vault format](docs/VAULT_FORMAT.md), the [threat model](docs/THREAT_MODEL.md), and the [case study](docs/CASE_STUDY.md) of what adversarial review found in the first design.
 
-It is built for pentest consultancies, internal red teams and security teams who today juggle spreadsheets, note apps, screenshot folders and a Word template.
+## Why
 
-![Engagement overview](docs/screenshots/engagement-overview.png)
+Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, Ghostwriter, SysReptor) put that data on a server someone has to run, patch and trust. OffsecHub makes the opposite trade: a private operator workspace whose entire state is a folder of ciphertext you control. It works offline, on a Kali VM or inside a client network without egress, and it answers a client's "where is our data?" in one sentence.
 
-> For the product view, positioning and the roadmap to a complete commercial product, see
-> [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md).
+## What it does
 
-## What's in the box
-
-| Area | What it does |
+| Area | |
 |---|---|
-| **Case management** | Clients and engagements (type, status workflow, testing window, rules of engagement), per-engagement teams with lead/tester/viewer roles, and a dashboard of what's due and what's open. |
-| **Scope** | Include/exclude rules for IPs, CIDRs, IP ranges, hostnames, wildcards, URL prefixes and free-text identifiers such as cloud account IDs. Exclusions always win. A **scope checker** answers "can I touch this?" before you do. Bulk entry auto-detects the rule type. |
-| **Targets** | Hosts, domains and web apps with services (port/proto/product/version), OS, tags and status (new → in progress → tested → compromised). Every target shows a live scope status and out-of-scope assets are flagged. |
-| **Recon** | Import **Nmap XML**, **nuclei JSON/JSONL** and plain host/URL lists (subfinder, amass, httpx). A **scope guard** never imports excluded hosts and skips out-of-scope hosts by default. nuclei results become *draft findings* grouped per template, with every affected asset attached. The raw tool output is kept as hashed evidence. |
-| **Testing** | Built-in checklists: OWASP WSTG (54 checks), OWASP API Top 10 2023, External Network, Internal Network & AD, and AWS Cloud. Apply them per engagement or per target, assign checks, record notes, and raise a finding straight from a failed check. Coverage feeds the report. |
-| **Evidence** | Upload screenshots or files, or paste text (HTTP request/response pairs, shell output). Each item gets a SHA-256 on upload for chain of custody and can be linked to a finding, target or test case. Active content (HTML/SVG) is only ever served as a download. |
-| **Findings** | Sequential IDs per engagement (`ACME-EXT-26-004`), a CVSS v3.1 calculator (severity follows the score unless overridden), CWE, affected assets, and a draft → confirmed → reported → remediated / risk accepted / false positive workflow. |
-| **Finding library** | 14 reviewed write-ups ship by default (SQLi, XSS, IDOR, SSRF, SMB signing, Kerberoasting, and more). Create a finding from a template, or promote a polished finding into the library. |
-| **Reporting** | Report readiness checks (untriaged drafts, missing remediation/evidence, incomplete methodology), an executive summary editor, and export to print-ready **HTML/PDF**, **Markdown** and **JSON**. Screenshots are embedded, and the report includes scope, methodology coverage, findings and an asset appendix. |
-| **Operator log** | A timestamped record of who ran what, from where, against what, with the outcome, for deconfliction with the client's SOC. Exports to CSV. |
-| **Audit trail** | Every sign-in, change, import, export and deletion is recorded per engagement and globally. |
-| **Automation** | Personal API tokens let you push scan output from an attack box or CI with a single `curl`. |
+| **Engagements** | Clients, engagements, testing windows, rules of engagement, status workflow, dashboard |
+| **Scope guard** | Include/exclude rules (IP, CIDR, range, host, `*.wildcard`, URL prefix). A scope checker. Every target shows live scope status. Imports never ingest excluded hosts. |
+| **Recon** | Import Nmap XML, nuclei JSON/JSONL and host lists; nuclei results become grouped draft findings; the raw output is kept as evidence |
+| **Testing** | OWASP WSTG, OWASP API Top 10, external, internal/AD and AWS checklists, per engagement or per target |
+| **Evidence** | Streamed straight into the vault, each file under its own key, with a SHA-256 fingerprint |
+| **Findings** | CVSS 3.1 calculator, CWE, draft → confirmed → remediated workflow, a reusable finding library |
+| **Reports** | Readiness checks, then print-ready HTML/PDF, Markdown or JSON, with an evidence-fingerprint appendix |
+| **Operator log** | Who ran what, from where, against what, with the outcome, for SOC deconfliction. Exports to CSV. |
+| **CLI** | `offsechub import ACME-EXT-26 scan.xml --tool nmap` pushes results into the running app |
 
-<p>
-  <img src="docs/screenshots/finding-editor.png" width="49%" alt="Finding editor with CVSS calculator" />
-  <img src="docs/screenshots/report-findings.png" width="49%" alt="Generated report" />
-</p>
+## Security at a glance
 
-## Quick start
+- **Encryption at rest.**
+  - A random master key protected by Argon2id (64 MiB, t=3) and a 256-bit recovery key.
+  - AES-256-GCM in the STREAM construction for the database and every evidence file.
+  - A fresh key for every snapshot and every file.
+- **Tamper evidence.** Every byte is authenticated.
+  - A whole-header MAC and revision counter detect deleted or rolled-back keyslots.
+  - A per-machine high-water mark detects vault rollback.
+  - A damaged database is quarantined, never silently swapped for its backup.
+- **Crash safety.**
+  - Atomic, fsynced saves, platform-aware: `F_FULLFSYNC` on macOS, write-through renames on Windows.
+  - Group commit, so a saved change really is on disk.
+  - A failed save never discards data.
+  - Evidence files are deleted only once no snapshot references them.
+- **Recovery.**
+  - A recovery key with a check symbol that catches every single typo.
+  - A recovery kit that restores access even if the vault header is lost.
+  - A rekey operation for suspected compromise.
+- **Local API hardening.** A one-time launch token, an exact Host allow-list against DNS rebinding, CSRF and Origin checks, and a pywebview JS bridge patched to an allow-list.
+- **Plaintext stays off disk.** In-memory SQLite with in-memory temp storage, streaming uploads (no multipart spooling), no access logs, and no core dumps.
+- **No lock-in.** [`tools/ohvault_decrypt.py`](tools/ohvault_decrypt.py) is an independent decoder written only from the spec. It decrypts your vault without OffsecHub.
 
-### Docker (recommended)
+What it does **not** protect against (for example, malware running as you while the vault is unlocked) is spelled out in the [threat model](docs/THREAT_MODEL.md#6-out-of-scope-stated-plainly).
+
+## Install and run
+
+Requirements: Python 3.11+, Node 20+ (to build the UI). On Linux, the native window needs WebKitGTK; without it, use `--browser`.
 
 ```bash
-cp .env.example .env            # set POSTGRES_PASSWORD and OFFSECHUB_ADMIN_PASSWORD
-docker compose up -d --build
-docker compose exec app python -m app.cli seed-demo   # optional demo engagement
-open http://127.0.0.1:8000
-```
+# Build the UI once
+cd frontend && npm install && npm run build && cd ..
 
-If `OFFSECHUB_ADMIN_PASSWORD` is empty, a random admin password is printed once in `docker compose logs app`.
-
-### Local development
-
-Requirements: Python 3.11+ and Node 20+.
-
-```bash
-# Backend (API on :8000)
+# Install and launch
 cd backend
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
-OFFSECHUB_ADMIN_PASSWORD=change-me-now-please python -m app.cli seed-demo
-uvicorn app.main:app --reload
-
-# Frontend (Vite on :5173, proxies /api to :8000)
-cd frontend
-npm install
-npm run dev
+pip install -e ".[dev]"            # add ".[gtk]" on Linux for the native window
+offsechub                          # opens the desktop window
+offsechub --browser                # no WebKit (e.g. minimal Kali/WSL): reduced-security browser mode
 ```
 
-Demo accounts use the password `offsechub-demo-password`:
-
-- `lead@offsechub.local`: engagement lead
-- `tester@offsechub.local`: tester
-- `viewer@offsechub.local`: read-only stakeholder
-- `admin@offsechub.local`: admin, using the password you set
-
-To serve the built UI from FastAPI without Vite, run `npm run build` in `frontend/` and open `http://127.0.0.1:8000`.
-
-### Tests
+Try it with sample data:
 
 ```bash
-cd backend && pytest -q                         # SQLite
-OFFSECHUB_TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost/offsechub_test pytest -q
-cd frontend && npm run build                    # type-check + production build
+offsechub demo ~/OffsecHub/Demo.ohvault     # prompts for a password, prints the recovery key once
+offsechub                                  # then open the Demo vault from the welcome screen
 ```
 
-CI (`.github/workflows/ci.yml`) runs the backend suite on SQLite and PostgreSQL, and builds the frontend.
-
-## Pushing tool output from the command line
-
-Create a token under **Settings → API tokens**, then:
+Push tool output from a terminal while the app is running:
 
 ```bash
-export OFFSECHUB=https://offsechub.example.internal
-export OFFSECHUB_TOKEN=ohub_...
-
 nmap -sV -oX scan.xml 203.0.113.0/24
-curl -H "Authorization: Bearer $OFFSECHUB_TOKEN" -F tool=nmap -F file=@scan.xml \
-     $OFFSECHUB/api/engagements/1/imports
-
-nuclei -l hosts.txt -jsonl -o nuclei.jsonl
-curl -H "Authorization: Bearer $OFFSECHUB_TOKEN" -F tool=nuclei -F file=@nuclei.jsonl \
-     $OFFSECHUB/api/engagements/1/imports
-
-# Before touching anything new:
-curl -H "Authorization: Bearer $OFFSECHUB_TOKEN" -H 'Content-Type: application/json' \
-     -d '{"values":["10.0.0.5","portal.example.com"]}' $OFFSECHUB/api/engagements/1/scope/check
+offsechub import ACME-EXT-26 scan.xml --tool nmap
+nuclei -l hosts.txt -jsonl -o nuclei.jsonl && offsechub import ACME-EXT-26 nuclei.jsonl --tool nuclei
 ```
 
-Interactive API docs are served at `/api/docs` (spec at `/api/openapi.json`; disable with `OFFSECHUB_API_DOCS=false`).
+Standalone desktop bundles (PyInstaller) for Linux, macOS and Windows are built by CI; see [`packaging/`](packaging/).
 
-## Architecture
-
-```
-backend/                 FastAPI + SQLAlchemy 2 (SQLite for dev, PostgreSQL for prod)
-  app/api/               one router per area (auth, engagements, scope, targets, recon, testing,
-                         evidence, findings, reports, activity)
-  app/services/          domain logic with no HTTP: scope matcher, CVSS 3.1, importers,
-                         evidence storage, reporting, audit
-  app/data/              methodology checklists and the default finding library (JSON)
-  app/templates/         Jinja2 report templates (HTML, Markdown)
-  tests/                 pytest suite (auth, access control, scope, CVSS, importers, evidence, reports)
-frontend/                React 19 + TypeScript + Vite + TanStack Query
-samples/                 sample Nmap / nuclei / host-list output used by tests and the demo
-```
-
-In production a single container serves the API under `/api` and the built SPA at `/`.
-
-## Security model
-
-OffsecHub stores the most sensitive data a client has: a map of how to break in. The design reflects that.
-
-- **Authentication.** Passwords are hashed with scrypt, and parameters are stored per hash so they can be raised later. Sessions are random tokens stored only as SHA-256, sent in an `HttpOnly`, `SameSite=Strict` cookie with a 12h default lifetime. Personal API tokens are hashed the same way, can expire, and can be revoked. Failed logins are throttled per IP and per email, and responses don't reveal whether an account exists.
-- **CSRF.** Every cookie-authenticated state change must carry an `X-Requested-With` header, which browsers won't send cross-site without a CORS preflight that is never granted. Login is protected the same way.
-- **Authorisation.** Global roles are admin, lead, tester and viewer. Non-admins only see engagements they are members of; everything else returns 404 so engagement existence doesn't leak. Scope changes and team management are restricted to engagement leads, and every object lookup is checked against its engagement. Viewers never receive draft findings in reports.
-- **Untrusted input.** Scanner output is parsed with `defusedxml`, which rejects XXE and entity expansion. Evidence is stored under random keys, never user-supplied paths. Only raster images are served inline; everything else goes out as `application/octet-stream` attachments with a sandboxing CSP. Reports are autoescaped and served with a no-script CSP.
-- **Headers.** Strict CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, and HSTS when `OFFSECHUB_COOKIE_SECURE=true`.
-- **Accountability.** An append-only audit trail keeps each user, action and IP, and survives engagement deletion.
-
-**Before production:** serve it behind TLS with `OFFSECHUB_COOKIE_SECURE=true`, use PostgreSQL, and put the evidence volume on encrypted storage. Also read the hardening items in the [roadmap](docs/PRODUCT_STRATEGY.md#phase-1-production-foundations-must-have-before-real-client-data): MFA/SSO, encryption at rest, and migrations.
-
-## Configuration
-
-All settings are environment variables with the `OFFSECHUB_` prefix (see `.env.example` and `backend/app/config.py`):
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `DATABASE_URL` | SQLite in `backend/data/runtime/` | e.g. `postgresql+psycopg://user:pass@db/offsechub` |
-| `STORAGE_DIR` | `backend/data/runtime/evidence` | Evidence file store |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@offsechub.local` / random | First-run admin account |
-| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
-| `SESSION_TTL_HOURS` | `12` | Browser session lifetime |
-| `MAX_UPLOAD_MB` | `50` | Evidence and import size limit |
-| `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_SECONDS` | `10` / `300` | Login throttling |
-| `CORS_ORIGINS` | `[]` | Only needed if the UI is served from another origin |
-| `API_DOCS` | `true` | Serve interactive API docs at `/api/docs` |
-
-## CLI
+## Development
 
 ```bash
-python -m app.cli create-user alice@example.com "Alice Doe" --role lead
-python -m app.cli seed-demo
+cd backend && pytest -q                    # backend + vault + security suites
+cd frontend && npm run build               # type-check + production build
+offsechub --dev                            # with `npm run dev` in frontend/ for hot reload
 ```
+
+```
+backend/app/vault/         encrypted vault: crypto, header, manager, durable I/O, hardening
+backend/app/localauth.py   localhost API authentication (launch token, Host/Origin/CSRF)
+backend/app/desktop.py     pywebview shell, hardened JS bridge, server lifecycle
+backend/app/api/           FastAPI routers (single operator)
+backend/app/services/      scope matcher, CVSS, importers, reporting, evidence storage
+frontend/                  React 19 + TypeScript + TanStack Query
+tools/                     independent vault decoder
+docs/                      vault format, threat model, architecture, case study
+```
+
+## Documentation
+
+- [Vault format](docs/VAULT_FORMAT.md): the normative on-disk spec, with test vectors
+- [Threat model](docs/THREAT_MODEL.md): adversaries, controls mapped to tests, out-of-scope items, plaintext artifacts
+- [Architecture](docs/ARCHITECTURE.md): process model, concurrency and persistence, API contract, ADRs
+- [Case study](docs/CASE_STUDY.md): the pivot, design principles, and what adversarial review found

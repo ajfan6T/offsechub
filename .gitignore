@@ -23,3 +23,13 @@ frontend/dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Desktop build outputs
+build/
+dist/
+packaging/build/
+packaging/dist/
+*.spec.bak
+
+# Local vaults created while developing
+*.ohvault/

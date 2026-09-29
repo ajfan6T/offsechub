@@ -2,13 +2,16 @@
 
 import base64
 from collections import Counter
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ..models import Engagement, User
+from ..models import Engagement, Evidence
 from ..schemas import REPORTABLE_STATUSES, SEVERITY_ORDER
+from ..vault.crypto import CryptoError
+from ..vault.manager import BlobIntegrityError
 from . import storage
 from .findings import finding_ref
 from .methodologies import load_methodologies
@@ -50,10 +53,24 @@ def _md_escape_cell(value: str) -> str:
     return (value or "").replace("|", "\\|").replace("\n", " ")
 
 
+def _byte_count(size: int) -> str:
+    return f"{size:,} byte{'' if size == 1 else 's'}"
+
+
 _md_env.filters["cell"] = _md_escape_cell
+for _env in (_html_env, _md_env):
+    _env.filters["bytes"] = _byte_count
+
+ImageReader = Callable[[Evidence], bytes]
 
 
-def build_context(eng: Engagement, user: User, include_drafts: bool, embed_images: bool) -> dict:
+def build_context(eng: Engagement, *, profile: dict, include_drafts: bool = False,
+                  read_image: ImageReader | None = None) -> dict:
+    """Everything the templates (and the JSON format) need.
+
+    ``read_image`` returns an evidence file's verified plaintext; when given,
+    raster images up to 5 MB are embedded as data: URIs (HTML only).
+    """
     statuses = set(REPORTABLE_STATUSES) | ({"draft"} if include_drafts else set())
     findings = sorted(
         (f for f in eng.findings if f.status in statuses),
@@ -61,25 +78,30 @@ def build_context(eng: Engagement, user: User, include_drafts: bool, embed_image
     )
     severity_counts = Counter(f.severity for f in findings)
 
-    finding_rows = []
+    finding_rows, fingerprints = [], []
     for f in findings:
+        ref = finding_ref(eng, f)
         images, attachments = [], []
-        for ev in sorted(f.evidence, key=lambda e: e.created_at):
+        for ev in sorted(f.evidence, key=lambda e: (e.created_at, e.id)):
             item = {"filename": ev.filename, "sha256": ev.sha256, "size": ev.size,
                     "description": ev.description, "content_type": ev.content_type}
-            if (embed_images and ev.content_type in storage.INLINE_IMAGE_TYPES
+            fingerprints.append({"finding": ref, "filename": ev.filename, "size": ev.size,
+                                 "sha256": ev.sha256})
+            if (read_image and ev.content_type in storage.INLINE_IMAGE_TYPES
                     and ev.size <= MAX_EMBED_BYTES):
                 try:
-                    data = storage.read_evidence(ev)
+                    data = read_image(ev)  # verified against its fingerprint
+                except (FileNotFoundError, BlobIntegrityError, CryptoError):
+                    # Never show a picture that isn't the recorded evidence.
+                    item["problem"] = "could not be verified; not embedded"
+                else:
                     item["data_uri"] = f"data:{ev.content_type};base64,{base64.b64encode(data).decode()}"
                     images.append(item)
                     continue
-                except FileNotFoundError:
-                    pass
             attachments.append(item)
         finding_rows.append({
             "id": f.id,
-            "ref": finding_ref(eng, f),
+            "ref": ref,
             "title": f.title,
             "severity": f.severity,
             "status": f.status,
@@ -132,10 +154,7 @@ def build_context(eng: Engagement, user: User, include_drafts: bool, embed_image
             "executive_summary": eng.executive_summary,
         },
         "client": {"name": eng.client.name, "contact_name": eng.client.contact_name},
-        "team": [
-            {"name": m.user.full_name, "email": m.user.email, "role": m.role}
-            for m in sorted(eng.members, key=lambda m: (m.role != "lead", m.user.full_name))
-        ],
+        "prepared_by": {k: (profile.get(k) or "").strip() for k in ("name", "organization", "email")},
         "scope": {
             "include": [{"kind": s.kind, "value": s.value, "notes": s.notes}
                         for s in eng.scope_items if s.rule == "include"],
@@ -145,6 +164,7 @@ def build_context(eng: Engagement, user: User, include_drafts: bool, embed_image
         "severity_counts": {s: severity_counts.get(s, 0) for s in SEVERITIES},
         "total_findings": len(findings),
         "findings": finding_rows,
+        "evidence_fingerprints": fingerprints,
         "coverage": coverage_rows,
         "targets": [
             {
@@ -159,7 +179,6 @@ def build_context(eng: Engagement, user: User, include_drafts: bool, embed_image
             for t in in_scope_targets
         ],
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "generated_by": user.full_name,
         "draft": include_drafts or eng.status not in ("delivered", "closed"),
     }
 

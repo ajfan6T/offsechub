@@ -65,15 +65,26 @@ def test_invalid_scope_values(kind, value):
         normalize_scope_value(kind, value)
 
 
-def test_scope_api_normalises_and_checks(admin, engagement):
+def test_scope_api_normalises_and_checks(api, engagement):
     base = f"/api/engagements/{engagement['id']}/scope"
-    item = admin.ok("POST", base, json={"kind": "cidr", "value": "198.51.100.77/24"})
+    item = api.ok("POST", base, json={"kind": "cidr", "value": "198.51.100.77/24"})
     assert item["value"] == "198.51.100.0/24"
-    assert admin.post(base, json={"kind": "cidr", "value": "198.51.100.0/24"}).status_code == 409
-    assert admin.post(base, json={"kind": "ip", "value": "nope"}).status_code == 422
-    results = admin.ok("POST", f"{base}/check", status=200,
-                       json={"values": ["203.0.113.3", "203.0.113.11", "8.8.8.8", "x.acme-corp.example"]})
+    assert api.post(base, json={"kind": "cidr", "value": "198.51.100.0/24"}).status_code == 409
+    assert api.post(base, json={"kind": "ip", "value": "nope"}).status_code == 422
+    results = api.ok("POST", f"{base}/check", status=200,
+                     json={"values": ["203.0.113.3", "203.0.113.11", "8.8.8.8", "x.acme-corp.example"]})
     assert [r["status"] for r in results] == ["in_scope", "excluded", "out_of_scope", "in_scope"]
+
+
+def test_scope_changes_are_recorded(api, engagement):
+    base = f"/api/engagements/{engagement['id']}/scope"
+    item = api.ok("POST", base, json={"kind": "ip", "value": "198.51.100.9"})
+    assert api.ok("PATCH", f"{base}/{item['id']}", json={"rule": "exclude"})["rule"] == "exclude"
+    api.ok("DELETE", f"{base}/{item['id']}")
+    assert item["id"] not in [s["id"] for s in api.ok("GET", base)]
+    summaries = [e["summary"] for e in api.ok("GET", f"/api/engagements/{engagement['id']}/activity")]
+    assert summaries[:3] == ["Removed scope exclude: ip 198.51.100.9", "Scope exclude: ip 198.51.100.9",
+                             "Scope include: ip 198.51.100.9"]
 
 
 @pytest.mark.parametrize("vector,score,severity", [
@@ -109,7 +120,7 @@ def test_cvss_rejects_invalid(vector):
         cvss.calculate(vector)
 
 
-def test_cvss_endpoint(admin):
-    r = admin.ok("POST", "/api/cvss", status=200, json={"vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"})
+def test_cvss_endpoint(api):
+    r = api.ok("POST", "/api/cvss", status=200, json={"vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"})
     assert r["score"] == 9.8 and r["severity"] == "critical"
-    assert admin.post("/api/cvss", json={"vector": "junk"}).status_code == 422
+    assert api.post("/api/cvss", json={"vector": "junk"}).status_code == 422

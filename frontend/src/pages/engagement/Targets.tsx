@@ -19,7 +19,7 @@ import type { Service, Target, TargetKind, TargetStatus } from "../../types";
 import { useEngagement, useTargets } from "./context";
 
 export function Targets() {
-  const { base, canWrite } = useEngagement();
+  const { base } = useEngagement();
   const q = useTargets(base);
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState("");
@@ -52,7 +52,7 @@ export function Targets() {
             <button key={v} className={scope === v ? "on" : ""} onClick={() => setScope(v)}>{l}</button>
           ))}
         </div>
-        {canWrite && <Button variant="primary" onClick={() => setAdding(true)}>Add target</Button>}
+        <Button variant="primary" onClick={() => setAdding(true)}>Add target</Button>
       </div>
       <Card>
         {q.isLoading ? (
@@ -96,7 +96,6 @@ export function Targets() {
                   <td onClick={(e) => e.stopPropagation()}>
                     <select
                       value={t.status}
-                      disabled={!canWrite}
                       className={t.status === "compromised" ? "select-danger" : ""}
                       onChange={(e) => {
                         setStatus.mutate({ id: t.id, status: e.target.value as TargetStatus });
@@ -177,7 +176,7 @@ function AddTarget({ onClose }: { onClose: () => void }) {
 const EMPTY_SERVICE = { port: "", protocol: "tcp", name: "", product: "", version: "" };
 
 function TargetDetail({ target: t, onClose }: { target: Target; onClose: () => void }) {
-  const { base, canWrite } = useEngagement();
+  const { base } = useEngagement();
   const [form, setForm] = useState({ kind: t.kind, hostname: t.hostname, ip: t.ip, os: t.os, tags: t.tags.join(", "), notes: t.notes });
   const [svc, setSvc] = useState(EMPTY_SERVICE);
   const invalidate = [[base, "targets"], [base, "summary"]];
@@ -199,23 +198,19 @@ function TargetDetail({ target: t, onClose }: { target: Target; onClose: () => v
       onClose={onClose}
       wide
       footer={
-        canWrite ? (
-          <>
-            <ConfirmButton variant="danger" className="mr-auto" message={`Delete ${t.value} and its services?`} onConfirm={() => remove.mutate(undefined)}>
-              Delete target
-            </ConfirmButton>
-            <Button onClick={onClose}>Close</Button>
-            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(undefined)}>Save</Button>
-          </>
-        ) : (
+        <>
+          <ConfirmButton variant="danger" className="mr-auto" message={`Delete ${t.value} and its services?`} onConfirm={() => remove.mutate(undefined)}>
+            Delete target
+          </ConfirmButton>
           <Button onClick={onClose}>Close</Button>
-        )
+          <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(undefined)}>Save</Button>
+        </>
       }
     >
       <div className="detail-meta">
         <ScopeBadge status={t.scope_status} /> <Badge>{TARGET_STATUSES[t.status]}</Badge> <span className="muted small">source: {t.source}</span>
       </div>
-      <fieldset disabled={!canWrite} className="form-grid">
+      <div className="form-grid">
         <Field label="Kind">
           <select value={form.kind} onChange={set("kind")}>
             {TARGET_KINDS.map((k) => <option key={k}>{k}</option>)}
@@ -226,7 +221,7 @@ function TargetDetail({ target: t, onClose }: { target: Target; onClose: () => v
         <Field label="OS"><input value={form.os} onChange={set("os")} /></Field>
         <Field label="Tags" wide><input value={form.tags} onChange={set("tags")} /></Field>
         <Field label="Notes" wide><textarea rows={3} value={form.notes} onChange={set("notes")} /></Field>
-      </fieldset>
+      </div>
 
       <h3>Services</h3>
       {t.services.length === 0 ? (
@@ -244,25 +239,23 @@ function TargetDetail({ target: t, onClose }: { target: Target; onClose: () => v
                 <td>{s.name}</td>
                 <td className="small">{[s.product, s.version, s.extra_info].filter(Boolean).join(" ")}</td>
                 <td className="right">
-                  {canWrite && <Button size="sm" variant="ghost" onClick={() => delSvc.mutate(s.id)}>Remove</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => delSvc.mutate(s.id)}>Remove</Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-      {canWrite && (
-        <div className="inline-form">
-          <input className="mono w-sm" placeholder="Port" value={svc.port} onChange={(e) => setSvc({ ...svc, port: e.target.value.replace(/\D/g, "") })} />
-          <select value={svc.protocol} onChange={(e) => setSvc({ ...svc, protocol: e.target.value })}>
-            <option>tcp</option><option>udp</option>
-          </select>
-          <input placeholder="Service (http)" value={svc.name} onChange={(e) => setSvc({ ...svc, name: e.target.value })} />
-          <input placeholder="Product" value={svc.product} onChange={(e) => setSvc({ ...svc, product: e.target.value })} />
-          <input placeholder="Version" value={svc.version} onChange={(e) => setSvc({ ...svc, version: e.target.value })} />
-          <Button disabled={!svc.port} onClick={() => addSvc.mutate(undefined)}>Add service</Button>
-        </div>
-      )}
+      <div className="inline-form">
+        <input className="mono w-sm" placeholder="Port" value={svc.port} onChange={(e) => setSvc({ ...svc, port: e.target.value.replace(/\D/g, "") })} />
+        <select value={svc.protocol} onChange={(e) => setSvc({ ...svc, protocol: e.target.value })}>
+          <option>tcp</option><option>udp</option>
+        </select>
+        <input placeholder="Service (http)" value={svc.name} onChange={(e) => setSvc({ ...svc, name: e.target.value })} />
+        <input placeholder="Product" value={svc.product} onChange={(e) => setSvc({ ...svc, product: e.target.value })} />
+        <input placeholder="Version" value={svc.version} onChange={(e) => setSvc({ ...svc, version: e.target.value })} />
+        <Button disabled={!svc.port} onClick={() => addSvc.mutate(undefined)}>Add service</Button>
+      </div>
       <p className="muted small">Kind: {titleCase(t.kind)} · added {new Date(t.created_at).toLocaleString()}</p>
     </Modal>
   );

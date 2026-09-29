@@ -1,12 +1,15 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from ..db import get_db
-from ..deps import EngagementAccess, engagement_reader
-from ..services import audit, reporting
+from ..bootstrap import get_setting
+from ..db import get_db, get_vault
+from ..deps import get_engagement
+from ..models import Engagement
+from ..services import audit, reporting, storage
+from ..vault.manager import OpenVault
 
 router = APIRouter(prefix="/api/engagements/{engagement_id}/report", tags=["reports"])
 
@@ -17,27 +20,27 @@ REPORT_CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; fram
 
 @router.get("")
 def generate_report(
-    request: Request,
     format: Literal["html", "md", "json"] = "html",
     include_drafts: bool = False,
     download: bool = False,
-    access: EngagementAccess = Depends(engagement_reader),
+    eng: Engagement = Depends(get_engagement),
     db: Session = Depends(get_db),
+    vault: OpenVault = Depends(get_vault),
 ):
-    eng = access.engagement
-    # Drafts are internal working material; read-only members only get the client view.
-    include_drafts = include_drafts and access.can_write
-    ctx = reporting.build_context(eng, access.user, include_drafts, embed_images=format == "html")
-    audit.record(db, user=access.user, action="export", entity_type="report", engagement_id=eng.id,
+    ctx = reporting.build_context(
+        eng,
+        profile=get_setting(db, "operator.profile") or {},
+        include_drafts=include_drafts,
+        read_image=(lambda ev: storage.read_evidence(vault, ev)) if format == "html" else None,
+    )
+    audit.record(db, action="export", entity_type="report", engagement_id=eng.id,
                  summary=f"Generated {format} report ({ctx['total_findings']} findings"
-                         f"{', drafts included' if include_drafts else ''})",
-                 request=request)
+                         f"{', drafts included' if include_drafts else ''})")
     db.commit()
 
-    filename = f"{eng.code}-report.{format}"
     headers = {"Cache-Control": "private, no-store"}
     if download:
-        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        headers["Content-Disposition"] = f'attachment; filename="{eng.code}-report.{format}"'
 
     if format == "json":
         return JSONResponse(ctx, headers=headers)

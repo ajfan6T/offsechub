@@ -1,31 +1,22 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router";
-import { useAuth, useUser } from "../auth";
+import type { VaultStatus } from "../types";
+import { useProfile, useVault } from "../vault/context";
+import { Button, Logo, useApiMutation } from "./ui";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/engagements", label: "Engagements" },
   { to: "/clients", label: "Clients" },
   { to: "/library", label: "Finding library" },
+  { to: "/activity", label: "Activity" },
 ];
 
-export function Logo() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden>
-      <path
-        d="M16 4 6 8.5v6.7c0 6.5 4.2 11.3 10 13 5.8-1.7 10-6.5 10-13V8.5z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="15" r="3.4" fill="currentColor" />
-    </svg>
-  );
-}
-
 export function Layout() {
-  const user = useUser();
-  const { logout } = useAuth();
+  const { status, lock } = useVault();
+  const profile = useProfile();
+  const lockNow = useApiMutation(() => lock());
+  const name = profile.data?.name ?? "";
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -33,41 +24,72 @@ export function Layout() {
           <Logo />
           <span>OffsecHub</span>
         </div>
+        <div className="vault-chip" title={status.path ?? undefined}>
+          <span>
+            <strong>{status.name}</strong>
+            <small>{status.auto_lock_minutes ? `Auto-locks after ${status.auto_lock_minutes} min idle` : "Auto-lock off"}</small>
+          </span>
+          <Button size="sm" loading={lockNow.isPending} onClick={() => lockNow.mutate(undefined)} title="Lock the vault (Settings has more options)">
+            Lock
+          </Button>
+        </div>
         <nav>
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? "active" : "")}>
               {n.label}
             </NavLink>
           ))}
-          {user.role === "admin" && (
-            <>
-              <div className="nav-section">Administration</div>
-              <NavLink to="/admin/users">Users</NavLink>
-              <NavLink to="/admin/audit">Audit log</NavLink>
-            </>
-          )}
         </nav>
         <div className="sidebar-footer">
           <NavLink to="/settings" className="user-chip">
-            <span className="avatar">{initials(user.full_name)}</span>
+            <span className="avatar">{initials(name) || "+"}</span>
             <span>
-              <strong>{user.full_name}</strong>
-              <small>{user.role}</small>
+              <strong>{name || "Set up your profile"}</strong>
+              <small>Settings</small>
             </span>
           </NavLink>
-          <button className="link" onClick={() => logout()}>
-            Sign out
-          </button>
         </div>
       </aside>
       <main className="main">
+        <VaultBanners status={status} />
         <Outlet />
       </main>
     </div>
   );
 }
 
-export function initials(name: string): string {
+/** Save failures stay until a save succeeds; unlock warnings and notices can be dismissed. */
+function VaultBanners({ status }: { status: VaultStatus }) {
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const dismissible = (tone: "error" | "info", messages: string[]) =>
+    messages
+      .filter((m) => !dismissed.includes(m))
+      .map((m) => (
+        <div key={m} className={`alert alert-${tone} alert-dismissible`} role={tone === "error" ? "alert" : "status"}>
+          <span>{m}</span>
+          <button className="icon-btn" aria-label="Dismiss" onClick={() => setDismissed([...dismissed, m])}>
+            ×
+          </button>
+        </div>
+      ));
+  return (
+    <>
+      {status.save_error && (
+        <div className="alert alert-error" role="alert">
+          <strong>Changes are not being saved.</strong> {status.save_error}
+          <div className="small">
+            OffsecHub keeps retrying. Until a save succeeds, recent changes exist only in memory: free up disk space or fix
+            the vault folder's permissions, and keep OffsecHub open.
+          </div>
+        </div>
+      )}
+      {dismissible("error", status.warnings)}
+      {dismissible("info", status.notices)}
+    </>
+  );
+}
+
+function initials(name: string): string {
   return name
     .split(/\s+/)
     .filter(Boolean)

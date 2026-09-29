@@ -18,7 +18,7 @@ import type { ScopeCheckResult, ScopeItem, ScopeKind } from "../../types";
 import { useEngagement } from "./context";
 
 export function Scope() {
-  const { base, canManage } = useEngagement();
+  const { base } = useEngagement();
   const q = useQuery({ queryKey: [base, "scope"], queryFn: () => api.get<ScopeItem[]>(`${base}/scope`) });
   const remove = useApiMutation((id: number) => api.del(`${base}/scope/${id}`), {
     invalidate: [[base, "scope"], [base, "targets"], [base, "summary"]],
@@ -44,11 +44,9 @@ export function Scope() {
             <td className="mono">{s.value}</td>
             <td className="muted">{s.notes}</td>
             <td className="right">
-              {canManage && (
-                <ConfirmButton size="sm" variant="ghost" message={`Remove ${s.value} from scope?`} onConfirm={() => remove.mutate(s.id)}>
-                  Remove
-                </ConfirmButton>
-              )}
+              <ConfirmButton size="sm" variant="ghost" message={`Remove ${s.value} from scope?`} onConfirm={() => remove.mutate(s.id)}>
+                Remove
+              </ConfirmButton>
             </td>
           </tr>
         ))}
@@ -67,7 +65,7 @@ export function Scope() {
         </Card>
       </div>
       <div className="stack">
-        {canManage ? <AddScope /> : <Card title="Scope"><p className="muted">Only engagement leads can change scope.</p></Card>}
+        <AddScope />
         <ScopeChecker />
         <Card title="How matching works">
           <ul className="small muted tight">

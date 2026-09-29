@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, qs } from "../api";
-import { canLead, useUser } from "../auth";
 import {
   Button,
   Card,
@@ -20,7 +19,6 @@ import { ENGAGEMENT_STATUSES, ENGAGEMENT_TYPES, fmtDate, titleCase } from "../li
 import type { Client, Engagement, EngagementType } from "../types";
 
 export function Engagements() {
-  const user = useUser();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -38,11 +36,9 @@ export function Engagements() {
         title="Engagements"
         subtitle="Every assessment is a case: scope, targets, testing, evidence, findings and the report."
         actions={
-          canLead(user) && (
-            <Button variant="primary" onClick={() => setCreating(true)}>
-              New engagement
-            </Button>
-          )
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            New engagement
+          </Button>
         }
       />
       <div className="toolbar">
@@ -61,9 +57,7 @@ export function Engagements() {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty title="No engagements">
-            {canLead(user) ? "Create one to get started." : "You haven't been added to any engagement yet."}
-          </Empty>
+          <Empty title="No engagements">{search || status ? "Nothing matches the filter." : "Create one to get started."}</Empty>
         ) : (
           <table className="table">
             <thead>
@@ -75,7 +69,6 @@ export function Engagements() {
                 <th>Status</th>
                 <th>Window</th>
                 <th>Findings (C/H/M/L/I)</th>
-                <th>My role</th>
               </tr>
             </thead>
             <tbody>
@@ -98,7 +91,6 @@ export function Engagements() {
                   <td>
                     <SeverityCounts counts={e.finding_counts} />
                   </td>
-                  <td className="muted">{e.my_role ?? (user.role === "admin" ? "admin" : "-")}</td>
                 </tr>
               ))}
             </tbody>

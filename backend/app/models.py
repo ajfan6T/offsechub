@@ -1,8 +1,8 @@
 """Database models.
 
-Enumerated fields are stored as plain strings; the allowed values live in
-``app.schemas`` (as ``Literal`` types) so the API validates them and the
-database stays portable across SQLite and PostgreSQL.
+Single-operator schema, stored in the vault's in-memory SQLite database.
+Enumerated fields are plain strings; the allowed values live in
+``app.schemas`` (as ``Literal`` types) so the API validates them.
 """
 
 from datetime import date, datetime, timezone
@@ -16,6 +16,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Table,
     Text,
@@ -37,33 +38,17 @@ class TimestampMixin:
     )
 
 
-class User(TimestampMixin, Base):
-    __tablename__ = "users"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    full_name: Mapped[str] = mapped_column(String(255))
-    password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20), default="tester")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class AuthToken(Base):
-    """Browser sessions and personal API tokens. Only a SHA-256 of the token is stored."""
 
-    __tablename__ = "auth_tokens"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    kind: Mapped[str] = mapped_column(String(10))  # session | api
-    name: Mapped[str] = mapped_column(String(100), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+class Setting(Base):
+    """Key/value settings stored inside the encrypted vault (operator profile, auto-lock)."""
 
-    user: Mapped[User] = relationship()
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[dict | list | str | int | bool | None] = mapped_column(JSON)
 
 
 class Client(TimestampMixin, Base):
@@ -93,12 +78,8 @@ class Engagement(TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     rules_of_engagement: Mapped[str] = mapped_column(Text, default="")
     executive_summary: Mapped[str] = mapped_column(Text, default="")
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     client: Mapped[Client] = relationship(back_populates="engagements")
-    members: Mapped[list["EngagementMember"]] = relationship(
-        back_populates="engagement", cascade="all, delete-orphan"
-    )
     scope_items: Mapped[list["ScopeItem"]] = relationship(
         back_populates="engagement", cascade="all, delete-orphan"
     )
@@ -122,18 +103,6 @@ class Engagement(TimestampMixin, Base):
     )
 
 
-class EngagementMember(Base):
-    __tablename__ = "engagement_members"
-
-    engagement_id: Mapped[int] = mapped_column(
-        ForeignKey("engagements.id", ondelete="CASCADE"), primary_key=True
-    )
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    role: Mapped[str] = mapped_column(String(20), default="tester")  # lead | tester | viewer
-    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    engagement: Mapped[Engagement] = relationship(back_populates="members")
-    user: Mapped[User] = relationship()
 
 
 class ScopeItem(Base):
@@ -216,11 +185,9 @@ class ReconImport(Base):
     filename: Mapped[str] = mapped_column(String(255))
     evidence_id: Mapped[int | None] = mapped_column(ForeignKey("evidence.id", ondelete="SET NULL"))
     stats: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     engagement: Mapped[Engagement] = relationship(back_populates="imports")
-    created_by: Mapped[User | None] = relationship()
 
 
 class TestCase(TimestampMixin, Base):
@@ -238,12 +205,10 @@ class TestCase(TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="not_started")
     notes: Mapped[str] = mapped_column(Text, default="")
-    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     target_id: Mapped[int | None] = mapped_column(ForeignKey("targets.id", ondelete="SET NULL"))
     finding_id: Mapped[int | None] = mapped_column(ForeignKey("findings.id", ondelete="SET NULL"))
 
     engagement: Mapped[Engagement] = relationship(back_populates="test_cases")
-    assignee: Mapped[User | None] = relationship()
 
 
 class Finding(TimestampMixin, Base):
@@ -268,14 +233,12 @@ class Finding(TimestampMixin, Base):
     references: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(50), default="manual")
     source_ref: Mapped[str] = mapped_column(String(512), default="")
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     engagement: Mapped[Engagement] = relationship(back_populates="findings")
     targets: Mapped[list[Target]] = relationship(
         secondary=finding_targets, back_populates="findings", order_by="Target.value"
     )
     evidence: Mapped[list["Evidence"]] = relationship(back_populates="finding")
-    created_by: Mapped[User | None] = relationship()
 
 
 class FindingTemplate(TimestampMixin, Base):
@@ -306,19 +269,20 @@ class Evidence(Base):
     content_type: Mapped[str] = mapped_column(String(100))
     size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64), index=True)
-    storage_key: Mapped[str] = mapped_column(String(255), unique=True)
+    storage_key: Mapped[str] = mapped_column(String(255), unique=True)  # blob id in the vault
+    # Random per-blob AES key. It exists only here (inside the encrypted DB), so
+    # deleting the row cryptographically erases the evidence file.
+    blob_key: Mapped[bytes] = mapped_column(LargeBinary(32))
     description: Mapped[str] = mapped_column(Text, default="")
     finding_id: Mapped[int | None] = mapped_column(ForeignKey("findings.id", ondelete="SET NULL"))
     target_id: Mapped[int | None] = mapped_column(ForeignKey("targets.id", ondelete="SET NULL"))
     test_case_id: Mapped[int | None] = mapped_column(
         ForeignKey("test_cases.id", ondelete="SET NULL")
     )
-    uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     engagement: Mapped[Engagement] = relationship(back_populates="evidence")
     finding: Mapped[Finding | None] = relationship(back_populates="evidence")
-    uploaded_by: Mapped[User | None] = relationship()
 
 
 class OperatorLogEntry(Base):
@@ -330,8 +294,8 @@ class OperatorLogEntry(Base):
     engagement_id: Mapped[int] = mapped_column(
         ForeignKey("engagements.id", ondelete="CASCADE"), index=True
     )
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    operator: Mapped[str] = mapped_column(String(255), default="")
     source_host: Mapped[str] = mapped_column(String(255), default="")
     target: Mapped[str] = mapped_column(String(512), default="")
     tool: Mapped[str] = mapped_column(String(100), default="")
@@ -341,14 +305,12 @@ class OperatorLogEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     engagement: Mapped[Engagement] = relationship(back_populates="oplog")
-    user: Mapped[User | None] = relationship()
 
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # SET NULL so the audit trail outlives a deleted engagement.
     engagement_id: Mapped[int | None] = mapped_column(
         ForeignKey("engagements.id", ondelete="SET NULL"), index=True
@@ -357,7 +319,5 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(50))
     entity_id: Mapped[int | None] = mapped_column(Integer)
     summary: Mapped[str] = mapped_column(Text, default="")
-    ip_address: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
-    user: Mapped[User | None] = relationship()

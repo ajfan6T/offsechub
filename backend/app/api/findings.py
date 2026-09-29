@@ -1,17 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..db import get_db
-from ..deps import (
-    EngagementAccess,
-    current_user,
-    engagement_reader,
-    engagement_writer,
-    get_or_404,
-    require_lead,
-)
-from ..models import Evidence, Finding, FindingTemplate, Target, User
+from ..db import get_db, get_vault
+from ..deps import get_engagement, get_or_404
+from ..models import Engagement, Evidence, Finding, FindingTemplate, Target
 from ..schemas import (
     SEVERITY_ORDER,
     CvssIn,
@@ -63,11 +56,10 @@ def _apply_cvss_or_422(finding: Finding, vector: str | None, severity: str | Non
 @router.get(prefix, response_model=list[FindingOut])
 def list_findings(severity: str | None = None,
                   status_filter: str | None = Query(None, alias="status"),
-                  access: EngagementAccess = Depends(engagement_reader),
-                  db: Session = Depends(get_db)):
+                  eng: Engagement = Depends(get_engagement), db: Session = Depends(get_db)):
     q = (
         select(Finding)
-        .where(Finding.engagement_id == access.engagement.id)
+        .where(Finding.engagement_id == eng.id)
         .options(selectinload(Finding.targets))
     )
     if severity:
@@ -80,10 +72,9 @@ def list_findings(severity: str | None = None,
 
 
 @router.post(prefix, response_model=FindingOut, status_code=201)
-def create_finding(body: FindingIn, request: Request,
-                   access: EngagementAccess = Depends(engagement_writer),
+def create_finding(body: FindingIn, eng: Engagement = Depends(get_engagement),
                    db: Session = Depends(get_db)):
-    eid = access.engagement.id
+    eid = eng.id
     base: dict = {}
     if body.template_id is not None:
         tpl = db.get(FindingTemplate, body.template_id)
@@ -105,7 +96,6 @@ def create_finding(body: FindingIn, request: Request,
         engagement_id=eid,
         number=next_finding_number(db, eid),
         source="template" if body.template_id else "manual",
-        created_by_id=access.user.id,
         severity=fallback_severity,
         **merged,
     )
@@ -114,26 +104,24 @@ def create_finding(body: FindingIn, request: Request,
     finding.targets = _resolve_targets(db, eid, body.target_ids)
     db.add(finding)
     db.flush()
-    audit.record(db, user=access.user, action="create", entity_type="finding", entity_id=finding.id,
+    audit.record(db, action="create", entity_type="finding", entity_id=finding.id,
                  engagement_id=eid,
-                 summary=f"{finding_ref(access.engagement, finding)} {finding.title} ({finding.severity})",
-                 request=request)
+                 summary=f"{finding_ref(eng, finding)} {finding.title} ({finding.severity})")
     db.commit()
     return finding_out(finding, 0)
 
 
 @router.get(prefix + "/{finding_id}", response_model=FindingOut)
-def get_finding(finding_id: int, access: EngagementAccess = Depends(engagement_reader),
+def get_finding(finding_id: int, eng: Engagement = Depends(get_engagement),
                 db: Session = Depends(get_db)):
-    f = get_or_404(db, Finding, finding_id, access.engagement.id)
+    f = get_or_404(db, Finding, finding_id, eng.id)
     return finding_out(f, _evidence_counts(db, [f.id]).get(f.id, 0))
 
 
 @router.patch(prefix + "/{finding_id}", response_model=FindingOut)
-def update_finding(finding_id: int, body: FindingUpdate, request: Request,
-                   access: EngagementAccess = Depends(engagement_writer),
-                   db: Session = Depends(get_db)):
-    eid = access.engagement.id
+def update_finding(finding_id: int, body: FindingUpdate,
+                   eng: Engagement = Depends(get_engagement), db: Session = Depends(get_db)):
+    eid = eng.id
     f = get_or_404(db, Finding, finding_id, eid)
     data = body.model_dump(exclude_unset=True)
     old_status = f.status
@@ -147,38 +135,33 @@ def update_finding(finding_id: int, body: FindingUpdate, request: Request,
         if v is not None:
             setattr(f, k, v)
 
-    summary = f"Updated {finding_ref(access.engagement, f)} {f.title}"
+    summary = f"Updated {finding_ref(eng, f)} {f.title}"
     if f.status != old_status:
         summary += f": status {old_status} -> {f.status}"
-    audit.record(db, user=access.user, action="update", entity_type="finding", entity_id=f.id,
-                 engagement_id=eid, summary=summary, request=request)
+    audit.record(db, action="update", entity_type="finding", entity_id=f.id,
+                 engagement_id=eid, summary=summary)
     db.commit()
     db.refresh(f)
     return finding_out(f, _evidence_counts(db, [f.id]).get(f.id, 0))
 
 
 @router.delete(prefix + "/{finding_id}", status_code=204)
-def delete_finding(finding_id: int, request: Request,
-                   access: EngagementAccess = Depends(engagement_writer),
+def delete_finding(finding_id: int, eng: Engagement = Depends(get_engagement),
                    db: Session = Depends(get_db)):
-    f = get_or_404(db, Finding, finding_id, access.engagement.id)
-    ref = finding_ref(access.engagement, f)
+    f = get_or_404(db, Finding, finding_id, eng.id)
+    ref = finding_ref(eng, f)
     db.delete(f)
-    audit.record(db, user=access.user, action="delete", entity_type="finding", entity_id=finding_id,
-                 engagement_id=access.engagement.id, summary=f"Deleted {ref} {f.title}",
-                 request=request)
+    audit.record(db, action="delete", entity_type="finding", entity_id=finding_id,
+                 engagement_id=eng.id, summary=f"Deleted {ref} {f.title}")
     db.commit()
 
 
 @router.post(prefix + "/{finding_id}/save-as-template", response_model=FindingTemplateOut,
              status_code=201)
-def save_as_template(finding_id: int, request: Request,
-                     access: EngagementAccess = Depends(engagement_reader),
+def save_as_template(finding_id: int, eng: Engagement = Depends(get_engagement),
                      db: Session = Depends(get_db)):
-    """Promote a polished write-up into the shared library (leads/admins)."""
-    if access.user.role not in ("admin", "lead"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only leads can curate the finding library")
-    f = get_or_404(db, Finding, finding_id, access.engagement.id)
+    """Promote a polished write-up into the vault's finding library."""
+    f = get_or_404(db, Finding, finding_id, eng.id)
     if db.scalar(select(FindingTemplate).where(FindingTemplate.title == f.title)):
         raise HTTPException(status.HTTP_409_CONFLICT, "A template with this title already exists")
     tpl = FindingTemplate(
@@ -188,9 +171,8 @@ def save_as_template(finding_id: int, request: Request,
     )
     db.add(tpl)
     db.flush()
-    audit.record(db, user=access.user, action="create", entity_type="finding_template",
-                 entity_id=tpl.id, summary=f"Saved '{tpl.title}' to the finding library",
-                 request=request)
+    audit.record(db, action="create", entity_type="finding_template", entity_id=tpl.id,
+                 summary=f"Saved '{tpl.title}' to the finding library")
     db.commit()
     return template_out(tpl)
 
@@ -209,8 +191,7 @@ def template_out(t: FindingTemplate) -> FindingTemplateOut:
 
 
 @router.get("/api/finding-templates", response_model=list[FindingTemplateOut])
-def list_templates(q: str | None = None, _: User = Depends(current_user),
-                   db: Session = Depends(get_db)):
+def list_templates(q: str | None = None, db: Session = Depends(get_db)):
     stmt = select(FindingTemplate).order_by(FindingTemplate.category, FindingTemplate.title)
     if q:
         like = f"%{q.lower()}%"
@@ -230,8 +211,7 @@ def _validate_template_vector(vector: str | None) -> str | None:
 
 
 @router.post("/api/finding-templates", response_model=FindingTemplateOut, status_code=201)
-def create_template(body: FindingTemplateIn, request: Request, user: User = Depends(require_lead),
-                    db: Session = Depends(get_db)):
+def create_template(body: FindingTemplateIn, db: Session = Depends(get_db)):
     if db.scalar(select(FindingTemplate).where(FindingTemplate.title == body.title)):
         raise HTTPException(status.HTTP_409_CONFLICT, "A template with this title already exists")
     data = body.model_dump()
@@ -239,15 +219,14 @@ def create_template(body: FindingTemplateIn, request: Request, user: User = Depe
     tpl = FindingTemplate(**data)
     db.add(tpl)
     db.flush()
-    audit.record(db, user=user, action="create", entity_type="finding_template", entity_id=tpl.id,
-                 summary=f"Created template '{tpl.title}'", request=request)
+    audit.record(db, action="create", entity_type="finding_template", entity_id=tpl.id,
+                 summary=f"Created template '{tpl.title}'")
     db.commit()
     return template_out(tpl)
 
 
 @router.patch("/api/finding-templates/{template_id}", response_model=FindingTemplateOut)
-def update_template(template_id: int, body: FindingTemplateUpdate, request: Request,
-                    user: User = Depends(require_lead), db: Session = Depends(get_db)):
+def update_template(template_id: int, body: FindingTemplateUpdate, db: Session = Depends(get_db)):
     tpl = db.get(FindingTemplate, template_id)
     if tpl is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Template not found")
@@ -260,26 +239,26 @@ def update_template(template_id: int, body: FindingTemplateUpdate, request: Requ
         raise HTTPException(status.HTTP_409_CONFLICT, "A template with this title already exists")
     for k, v in data.items():
         setattr(tpl, k, v)
-    audit.record(db, user=user, action="update", entity_type="finding_template", entity_id=tpl.id,
-                 summary=f"Updated template '{tpl.title}'", request=request)
+    audit.record(db, action="update", entity_type="finding_template", entity_id=tpl.id,
+                 summary=f"Updated template '{tpl.title}'")
     db.commit()
     return template_out(tpl)
 
 
 @router.delete("/api/finding-templates/{template_id}", status_code=204)
-def delete_template(template_id: int, request: Request, user: User = Depends(require_lead),
-                    db: Session = Depends(get_db)):
+def delete_template(template_id: int, db: Session = Depends(get_db)):
     tpl = db.get(FindingTemplate, template_id)
     if tpl is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Template not found")
     db.delete(tpl)
-    audit.record(db, user=user, action="delete", entity_type="finding_template",
-                 entity_id=template_id, summary=f"Deleted template '{tpl.title}'", request=request)
+    audit.record(db, action="delete", entity_type="finding_template",
+                 entity_id=template_id, summary=f"Deleted template '{tpl.title}'")
     db.commit()
 
 
-@router.post("/api/cvss", response_model=CvssOut)
-def score_cvss(body: CvssIn, _: User = Depends(current_user)):
+# Pure computation, but like every domain endpoint it is unavailable (423) while locked.
+@router.post("/api/cvss", response_model=CvssOut, dependencies=[Depends(get_vault)])
+def score_cvss(body: CvssIn):
     try:
         r = cvss.calculate(body.vector)
     except cvss.CvssError as exc:

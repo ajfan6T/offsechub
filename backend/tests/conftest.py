@@ -1,80 +1,79 @@
-import os
-import tempfile
+"""Shared fixtures: an isolated app + unlocked vault per test."""
+
+import time
 from pathlib import Path
 
-# Configure an isolated database and evidence store before the app is imported.
-_TMP = Path(tempfile.mkdtemp(prefix="offsechub-tests-"))
-# Set OFFSECHUB_TEST_DATABASE_URL (e.g. postgresql+psycopg://...) to run against PostgreSQL.
-os.environ["OFFSECHUB_DATABASE_URL"] = os.environ.get(
-    "OFFSECHUB_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"
-)
-os.environ["OFFSECHUB_STORAGE_DIR"] = str(_TMP / "evidence")
-os.environ["OFFSECHUB_ADMIN_EMAIL"] = "admin@test.local"
-os.environ["OFFSECHUB_ADMIN_PASSWORD"] = "admin-password-123"
-os.environ["OFFSECHUB_FRONTEND_DIST"] = str(_TMP / "no-frontend")
+import pytest
+from fastapi.testclient import TestClient
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from app.localauth import LocalAuth
+from app.vault import header as vault_header
+from app.vault.appconfig import AppConfig
+from app.vault.crypto import Argon2Params
+from app.vault.manager import VaultManager
 
-from app import db as db_module  # noqa: E402
-from app import security  # noqa: E402
-from app.api import auth as auth_api  # noqa: E402
-from app.main import app  # noqa: E402
-
-# Cheap hashing keeps the suite fast; parameters are stored per hash so this is safe.
-security._SCRYPT_N = 2**10
-
-ADMIN = ("admin@test.local", "admin-password-123")
-PASSWORD = "correct-horse-battery"
+PASSWORD = "correct horse battery staple"
 SAMPLES = Path(__file__).resolve().parents[2] / "samples"
 
 
+@pytest.fixture(autouse=True)
+def fast_kdf(monkeypatch):
+    """Minimum allowed Argon2 cost keeps the suite fast (real vaults use 64 MiB/t=3)."""
+    monkeypatch.setattr(vault_header, "DEFAULT_ARGON2", Argon2Params(m_kib=19456, t=2, p=1))
+
+
 class Api(TestClient):
-    """A TestClient that always sends the CSRF header and raises on unexpected status."""
+    """TestClient that sends the CSRF header and asserts expected status codes."""
 
-    def __init__(self):
+    def __init__(self, app):
         super().__init__(app, headers={"X-Requested-With": "OffsecHub"})
-
-    def login(self, email: str, password: str) -> "Api":
-        r = self.post("/api/auth/login", json={"email": email, "password": password})
-        assert r.status_code == 200, r.text
-        return self
 
     def ok(self, method: str, url: str, status: int | None = None, **kw):
         r = self.request(method, url, **kw)
-        expected = status or (201 if method.upper() == "POST" else 204 if method.upper() == "DELETE" else 200)
+        m = method.upper()
+        expected = status or (201 if m == "POST" else 204 if m == "DELETE" else 200)
         assert r.status_code == expected, f"{method} {url} -> {r.status_code}: {r.text}"
-        return r.json() if r.content and r.headers.get("content-type", "").startswith("application/json") else r
-
-
-@pytest.fixture(autouse=True)
-def fresh_db():
-    db_module.Base.metadata.drop_all(db_module.engine)
-    auth_api.throttle._failures.clear()
-    yield
+        ctype = r.headers.get("content-type", "")
+        return r.json() if r.content and ctype.startswith("application/json") else r
 
 
 @pytest.fixture
-def admin() -> Api:
-    with Api() as c:  # entering runs the lifespan -> bootstrap (tables + admin)
-        yield c.login(*ADMIN)
+def app_ctx(tmp_path):
+    from app.main import create_app  # imported lazily so unit suites don't need the routers
+
+    manager = VaultManager(AppConfig(tmp_path / "config"))
+    auth = LocalAuth()
+    auth.allowed_hosts = {"testserver"}
+    auth.allowed_origins = {"http://testserver"}
+    app = create_app(manager, auth, frontend_dist=tmp_path / "no-frontend")
+    yield app, manager, auth
+    manager.shutdown()
 
 
 @pytest.fixture
-def make_user(admin):
-    def _make(email: str, role: str = "tester", name: str | None = None) -> Api:
-        admin.ok("POST", "/api/users", json={"email": email, "full_name": name or email.split("@")[0],
-                                             "password": PASSWORD, "role": role})
-        return Api().login(email, PASSWORD)
-
-    return _make
+def anon(app_ctx):
+    """A client that has exchanged the launch token but has no vault open."""
+    app, _manager, auth = app_ctx
+    client = Api(app)
+    r = client.get(f"/_launch?token={auth.new_launch_token()}", follow_redirects=False)
+    assert r.status_code == 303
+    return client
 
 
 @pytest.fixture
-def engagement(admin):
-    """A client + engagement with a realistic scope, owned by the admin."""
-    client = admin.ok("POST", "/api/clients", json={"name": "ACME"})
-    eng = admin.ok("POST", "/api/engagements", json={
+def api(anon, tmp_path):
+    """Authenticated client with a freshly created, unlocked vault."""
+    body = anon.ok("POST", "/api/vault/create", json={"path": str(tmp_path / "test"), "password": PASSWORD})
+    anon.recovery_key = body["recovery_key"]
+    anon.vault_path = body["status"]["path"]
+    return anon
+
+
+@pytest.fixture
+def engagement(api):
+    """A client + engagement with a realistic scope."""
+    client = api.ok("POST", "/api/clients", json={"name": "ACME"})
+    eng = api.ok("POST", "/api/engagements", json={
         "client_id": client["id"], "name": "External test", "code": "ACME-EXT",
         "type": "external_network", "start_date": "2026-09-01", "end_date": "2026-09-30",
     })
@@ -85,9 +84,21 @@ def engagement(admin):
         ("domain", "vpn.acme-corp.example", "exclude"),
         ("ip", "203.0.113.11", "exclude"),
     ]:
-        admin.ok("POST", f"{base}/scope", json={"kind": kind, "value": value, "rule": rule})
+        api.ok("POST", f"{base}/scope", json={"kind": kind, "value": value, "rule": rule})
     return eng
 
 
-def user_id(admin: Api, email: str) -> int:
-    return next(u["id"] for u in admin.ok("GET", "/api/users") if u["email"] == email)
+@pytest.fixture
+def vault(api, app_ctx):
+    """The unlocked vault behind ``api``, for inspecting rows and blob files directly."""
+    return app_ctx[1].require()
+
+
+def wait_until(predicate, timeout: float = 5.0) -> bool:
+    """Poll for work the vault does in the background (saves, blob sweeps)."""
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.02)
+    return True

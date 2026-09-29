@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api";
-import { canLead, useUser } from "../auth";
 import { Button, Card, Empty, ErrorBox, Field, Loading, Modal, PageHeader, useApiMutation } from "../components/ui";
 import type { Client } from "../types";
 
 export function Clients() {
-  const user = useUser();
   const [editing, setEditing] = useState<Client | "new" | null>(null);
   const q = useQuery({ queryKey: ["clients"], queryFn: () => api.get<Client[]>("/api/clients") });
 
@@ -16,11 +14,9 @@ export function Clients() {
         title="Clients"
         subtitle="Organisations you test for."
         actions={
-          canLead(user) && (
-            <Button variant="primary" onClick={() => setEditing("new")}>
-              New client
-            </Button>
-          )
+          <Button variant="primary" onClick={() => setEditing("new")}>
+            New client
+          </Button>
         }
       />
       <Card>
@@ -52,11 +48,9 @@ export function Clients() {
                   </td>
                   <td>{c.engagement_count}</td>
                   <td className="right">
-                    {canLead(user) && (
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(c)}>
-                        Edit
-                      </Button>
-                    )}
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(c)}>
+                      Edit
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -70,7 +64,6 @@ export function Clients() {
 }
 
 function ClientForm({ client, onClose }: { client: Client | null; onClose: () => void }) {
-  const user = useUser();
   const [form, setForm] = useState({
     name: client?.name ?? "",
     industry: client?.industry ?? "",
@@ -95,7 +88,7 @@ function ClientForm({ client, onClose }: { client: Client | null; onClose: () =>
       onClose={onClose}
       footer={
         <>
-          {client && user.role === "admin" && (
+          {client && (
             <Button
               variant="danger"
               className="mr-auto"

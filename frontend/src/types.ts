@@ -1,7 +1,61 @@
-// Mirrors backend/app/schemas.py.
+// Mirrors backend/app/schemas.py and the vault/app endpoints in backend/app/api/vault.py.
 
-export type Role = "admin" | "lead" | "tester" | "viewer";
-export type MemberRole = "lead" | "tester" | "viewer";
+// ------------------------------------------------------------- vault and app
+
+export type VaultState = "none" | "locked" | "unlocked";
+
+export interface VaultStatus {
+  state: VaultState;
+  path: string | null;
+  name: string | null;
+  /** 0 means auto-lock is off. */
+  auto_lock_minutes: number;
+  /** Null while locked or when auto-lock is off. */
+  seconds_until_lock: number | null;
+  /** Why the vault is locked: "manual", "idle" or "exit" (null while unlocked). */
+  lock_reason: string | null;
+  /** Unlocked with the recovery key: a new password must be chosen before anything else. */
+  must_set_password: boolean;
+  /** Integrity problems found on unlock (fell back to a backup, quarantined a file...). */
+  warnings: string[];
+  notices: string[];
+  /** Last failed background save; cleared by the next successful one. */
+  save_error: string | null;
+}
+
+export interface AppInfo {
+  version: string;
+  /** Running inside the native desktop shell (vs. --browser mode). */
+  desktop: boolean;
+  platform: string;
+  default_vault_dir: string;
+}
+
+export interface RecentVault {
+  path: string;
+  name: string;
+  exists: boolean;
+}
+
+export interface RecentVaults {
+  remember_recent: boolean;
+  vaults: RecentVault[];
+}
+
+/** Operator profile, stored inside the vault; used on reports and in the op log. */
+export interface Profile {
+  name: string;
+  email: string;
+  organization: string;
+}
+
+export interface RecoveryKeyResult {
+  recovery_key: string;
+}
+
+// ---------------------------------------------------------------- domain
+
+
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type FindingStatus =
   | "draft"
@@ -30,29 +84,6 @@ export type TargetStatus = "new" | "in_progress" | "tested" | "compromised";
 export type TestStatus = "not_started" | "in_progress" | "passed" | "failed" | "not_applicable" | "blocked";
 export type OplogOutcome = "info" | "success" | "failure" | "detected";
 
-export interface UserBrief {
-  id: number;
-  full_name: string;
-  email: string;
-}
-
-export interface User extends UserBrief {
-  role: Role;
-  is_active: boolean;
-  created_at: string;
-  last_login_at: string | null;
-}
-
-export interface ApiToken {
-  id: number;
-  name: string;
-  kind: string;
-  created_at: string;
-  expires_at: string | null;
-  last_used_at: string | null;
-  token?: string;
-}
-
 export interface Client {
   id: number;
   name: string;
@@ -78,14 +109,7 @@ export interface Engagement {
   executive_summary: string;
   created_at: string;
   updated_at: string;
-  my_role: MemberRole | null;
   finding_counts: Partial<Record<Severity, number>>;
-}
-
-export interface Member {
-  user: UserBrief;
-  role: MemberRole;
-  added_at: string;
 }
 
 export interface EngagementSummary {
@@ -164,7 +188,6 @@ export interface ReconImport {
     errors: string[];
   };
   created_at: string;
-  created_by: UserBrief | null;
 }
 
 export interface Methodology {
@@ -184,7 +207,6 @@ export interface TestCase {
   description: string;
   status: TestStatus;
   notes: string;
-  assignee: UserBrief | null;
   target_id: number | null;
   finding_id: number | null;
   updated_at: string;
@@ -200,7 +222,6 @@ export interface Evidence {
   finding_id: number | null;
   target_id: number | null;
   test_case_id: number | null;
-  uploaded_by: UserBrief | null;
   created_at: string;
   is_image: boolean;
 }
@@ -223,7 +244,6 @@ export interface Finding {
   source: string;
   targets: { id: number; value: string; kind: string }[];
   evidence_count: number;
-  created_by: UserBrief | null;
   created_at: string;
   updated_at: string;
 }
@@ -258,26 +278,26 @@ export interface OplogEntry {
   command: string;
   description: string;
   outcome: OplogOutcome;
-  user: UserBrief | null;
+  /** Profile name at the time of logging, so exported logs stay attributable. */
+  operator: string;
   created_at: string;
 }
 
-export interface AuditEvent {
+/** One entry of the vault's append-only activity log (AuditEvent on the backend). */
+export interface ActivityEvent {
   id: number;
-  user: UserBrief | null;
   engagement_id: number | null;
   action: string;
   entity_type: string;
   entity_id: number | null;
   summary: string;
-  ip_address: string;
   created_at: string;
 }
 
 export interface Dashboard {
   engagements_by_status: Partial<Record<EngagementStatus, number>>;
   open_findings_by_severity: Partial<Record<Severity, number>>;
-  my_open_tests: number;
+  open_tests: number;
   active_engagements: Engagement[];
   recent_findings: {
     id: number;

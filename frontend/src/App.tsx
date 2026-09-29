@@ -1,15 +1,11 @@
 import { Navigate, Route, Routes } from "react-router";
-import { useAuth } from "./auth";
 import { Layout } from "./components/Layout";
-import { Loading } from "./components/ui";
-import { AuditLog } from "./pages/AuditLog";
+import { ActivityLog } from "./pages/ActivityLog";
 import { Clients } from "./pages/Clients";
 import { Dashboard } from "./pages/Dashboard";
 import { Engagements } from "./pages/Engagements";
 import { Library } from "./pages/Library";
-import { Login } from "./pages/Login";
 import { Settings } from "./pages/Settings";
-import { Users } from "./pages/Users";
 import { Activity } from "./pages/engagement/Activity";
 import { EngagementLayout } from "./pages/engagement/EngagementLayout";
 import { EvidencePage } from "./pages/engagement/Evidence";
@@ -23,11 +19,8 @@ import { Scope } from "./pages/engagement/Scope";
 import { Targets } from "./pages/engagement/Targets";
 import { Testing } from "./pages/engagement/Testing";
 
+/** The workspace of an unlocked vault (the VaultGate renders it only then). */
 export function App() {
-  const { user, loading } = useAuth();
-  if (loading) return <Loading label="Starting OffsecHub" />;
-  if (!user) return <Login />;
-
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -49,9 +42,8 @@ export function App() {
         </Route>
         <Route path="clients" element={<Clients />} />
         <Route path="library" element={<Library />} />
+        <Route path="activity" element={<ActivityLog />} />
         <Route path="settings" element={<Settings />} />
-        {user.role === "admin" && <Route path="admin/users" element={<Users />} />}
-        {user.role === "admin" && <Route path="admin/audit" element={<AuditLog />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
