@@ -1,0 +1,85 @@
+{
+  "id": "external-network",
+  "name": "External Network Penetration Test",
+  "description": "Internet-facing infrastructure assessment.",
+  "cases": [
+    {
+      "ref": "EXT-01",
+      "category": "Reconnaissance",
+      "title": "Passive OSINT and attack surface discovery",
+      "description": "Certificate transparency, DNS, ASN/IP ownership, leaked credentials."
+    },
+    {
+      "ref": "EXT-02",
+      "category": "Reconnaissance",
+      "title": "Subdomain enumeration and resolution",
+      "description": ""
+    },
+    {
+      "ref": "EXT-03",
+      "category": "Reconnaissance",
+      "title": "Confirm asset ownership against scope",
+      "description": "Verify every IP/host is owned by the client before active testing."
+    },
+    {
+      "ref": "EXT-04",
+      "category": "Discovery",
+      "title": "Full TCP port scan of in-scope ranges",
+      "description": ""
+    },
+    {
+      "ref": "EXT-05",
+      "category": "Discovery",
+      "title": "Top UDP port scan",
+      "description": ""
+    },
+    {
+      "ref": "EXT-06",
+      "category": "Discovery",
+      "title": "Service and version fingerprinting",
+      "description": ""
+    },
+    {
+      "ref": "EXT-07",
+      "category": "Vulnerability Analysis",
+      "title": "Automated vulnerability scanning",
+      "description": "Triage and validate every scanner result manually."
+    },
+    {
+      "ref": "EXT-08",
+      "category": "Vulnerability Analysis",
+      "title": "TLS/SSL configuration review",
+      "description": ""
+    },
+    {
+      "ref": "EXT-09",
+      "category": "Vulnerability Analysis",
+      "title": "Exposed management interfaces",
+      "description": "RDP, SSH, VPN portals, admin panels, databases."
+    },
+    {
+      "ref": "EXT-10",
+      "category": "Vulnerability Analysis",
+      "title": "DNS configuration review",
+      "description": "Zone transfer, SPF/DKIM/DMARC, dangling records."
+    },
+    {
+      "ref": "EXT-11",
+      "category": "Exploitation",
+      "title": "Password spraying against external authentication",
+      "description": "Only within agreed lockout thresholds."
+    },
+    {
+      "ref": "EXT-12",
+      "category": "Exploitation",
+      "title": "Exploit validated vulnerabilities",
+      "description": "Within the rules of engagement; record in the operator log."
+    },
+    {
+      "ref": "EXT-13",
+      "category": "Web",
+      "title": "Web application surface triage",
+      "description": "Identify apps warranting deeper testing."
+    }
+  ]
+}

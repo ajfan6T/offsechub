@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ engagement.code }} - {{ engagement.name }} - Security Assessment Report</title>
+<style>
+  :root {
+    --critical: #7f1d1d; --high: #dc2626; --medium: #ea580c; --low: #ca8a04; --info: #2563eb;
+    --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --accent: #0f766e;
+  }
+  * { box-sizing: border-box; }
+  body { font: 11pt/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); margin: 0; background: #f3f4f6; }
+  .page { background: #fff; max-width: 900px; margin: 24px auto; padding: 56px 64px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  h1, h2, h3 { line-height: 1.25; }
+  h1 { font-size: 26pt; margin: 0 0 8px; }
+  h2 { font-size: 16pt; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-top: 40px; }
+  h3 { font-size: 13pt; margin: 0; }
+  .muted { color: var(--muted); }
+  .cover { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; border-left: 8px solid var(--accent); padding-left: 32px; }
+  .cover .kicker { text-transform: uppercase; letter-spacing: .12em; color: var(--accent); font-weight: 600; font-size: 10pt; }
+  .draft-banner { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 8px 12px; border-radius: 6px; font-weight: 600; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f9fafb; font-weight: 600; }
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 999px; color: #fff; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .sev-critical { background: var(--critical); } .sev-high { background: var(--high); }
+  .sev-medium { background: var(--medium); } .sev-low { background: var(--low); } .sev-info { background: var(--info); }
+  .bars { display: grid; grid-template-columns: 90px 1fr 40px; gap: 6px 12px; align-items: center; max-width: 520px; }
+  .bar { height: 14px; border-radius: 3px; }
+  td.ref { white-space: nowrap; }
+  td.hash { word-break: break-all; font-size: 8.5pt; }
+  .finding { border: 1px solid var(--line); border-radius: 8px; margin: 24px 0; page-break-inside: avoid; }
+  .finding-head { display: flex; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); background: #f9fafb; border-radius: 8px 8px 0 0; }
+  .finding-body { padding: 4px 18px 16px; }
+  .meta { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; font-size: 10pt; margin: 12px 0; }
+  .meta dt { color: var(--muted); } .meta dd { margin: 0; word-break: break-word; }
+  .text { white-space: pre-wrap; word-wrap: break-word; }
+  pre, code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9.5pt; }
+  .steps { background: #0b1220; color: #e5e7eb; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+  .evidence img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; margin-top: 8px; }
+  .evidence figure { margin: 16px 0; }
+  .evidence figcaption { font-size: 9pt; color: var(--muted); }
+  .toc a { color: inherit; text-decoration: none; }
+  .toc li { margin: 3px 0; }
+  footer { font-size: 9pt; color: var(--muted); margin-top: 48px; border-top: 1px solid var(--line); padding-top: 12px; }
+  @media print {
+    body { background: #fff; }
+    .page { box-shadow: none; margin: 0; max-width: none; padding: 0; }
+    .cover { page-break-after: always; min-height: 90vh; }
+    h2 { page-break-after: avoid; }
+    .pb { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<section class="cover">
+  {% if draft %}<div class="draft-banner">DRAFT - not for distribution</div>{% endif %}
+  <div class="kicker">{{ engagement.type }}</div>
+  <h1>{{ client.name }}</h1>
+  <div style="font-size:15pt">{{ engagement.name }}</div>
+  <p class="muted">
+    Reference {{ engagement.code }}<br>
+    {% if engagement.start_date %}Testing window {{ engagement.start_date }}{% if engagement.end_date %} to {{ engagement.end_date }}{% endif %}<br>{% endif %}
+    Generated {{ generated_at }} by {{ generated_by }}
+  </p>
+  <p class="muted" style="font-size:9pt">CONFIDENTIAL. This report contains sensitive security information about {{ client.name }}. Distribution is restricted to authorised recipients.</p>
+</section>
+
+<h2>Contents</h2>
+<ol class="toc">
+  <li><a href="#summary">Executive summary</a></li>
+  <li><a href="#overview">Findings overview</a></li>
+  <li><a href="#scope">Scope and rules of engagement</a></li>
+  <li><a href="#methodology">Methodology and coverage</a></li>
+  <li><a href="#findings">Detailed findings</a>
+    <ol>{% for f in findings %}<li><a href="#f-{{ f.id }}">{{ f.ref }} {{ f.title }}</a></li>{% endfor %}</ol>
+  </li>
+  <li><a href="#appendix">Appendix: assets in scope</a></li>
+</ol>
+
+<h2 id="summary" class="pb">1. Executive summary</h2>
+{% if engagement.executive_summary %}
+<div class="text">{{ engagement.executive_summary }}</div>
+{% else %}
+<p class="muted"><em>No executive summary has been written yet.</em></p>
+{% endif %}
+{% if engagement.description %}
+<h3 style="margin-top:20px">Engagement background</h3>
+<div class="text">{{ engagement.description }}</div>
+{% endif %}
+
+<h2 id="overview">2. Findings overview</h2>
+<p>{{ total_findings }} finding{{ '' if total_findings == 1 else 's' }} reported.</p>
+{% set maxc = [severity_counts.values()|max, 1]|max %}
+<div class="bars">
+{% for sev, n in severity_counts.items() %}
+  <div><span class="sev sev-{{ sev }}">{{ sev }}</span></div>
+  <div><div class="bar sev-{{ sev }}" style="width: {{ (n / maxc * 100)|round(1) }}%"></div></div>
+  <div><strong>{{ n }}</strong></div>
+{% endfor %}
+</div>
+{% if findings %}
+<table>
+  <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>CVSS</th><th>Status</th><th>Affected</th></tr></thead>
+  <tbody>
+  {% for f in findings %}
+  <tr>
+    <td class="mono ref"><a href="#f-{{ f.id }}">{{ f.ref }}</a></td>
+    <td>{{ f.title }}</td>
+    <td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td>
+    <td>{{ f.cvss_score if f.cvss_score is not none else '-' }}</td>
+    <td>{{ f.status|replace('_', ' ') }}</td>
+    <td>{{ f.targets|length }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2 id="scope">3. Scope and rules of engagement</h2>
+<h3>In scope</h3>
+{% if scope.include %}
+<table><thead><tr><th>Type</th><th>Value</th><th>Notes</th></tr></thead><tbody>
+{% for s in scope.include %}<tr><td>{{ s.kind }}</td><td class="mono">{{ s.value }}</td><td>{{ s.notes }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p class="muted">No scope recorded.</p>{% endif %}
+{% if scope.exclude %}
+<h3>Explicitly excluded</h3>
+<table><thead><tr><th>Type</th><th>Value</th><th>Notes</th></tr></thead><tbody>
+{% for s in scope.exclude %}<tr><td>{{ s.kind }}</td><td class="mono">{{ s.value }}</td><td>{{ s.notes }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% if engagement.rules_of_engagement %}
+<h3>Rules of engagement</h3>
+<div class="text">{{ engagement.rules_of_engagement }}</div>
+{% endif %}
+
+<h2 id="methodology">4. Methodology and coverage</h2>
+{% if coverage %}
+<table>
+  <thead><tr><th>Methodology</th><th>Checks</th><th>Passed</th><th>Vulnerable</th><th>N/A</th><th>Blocked</th><th>Not completed</th></tr></thead>
+  <tbody>
+  {% for c in coverage %}
+  <tr><td>{{ c.methodology }}</td><td>{{ c.total }}</td><td>{{ c.passed }}</td><td>{{ c.failed }}</td><td>{{ c.not_applicable }}</td><td>{{ c.blocked }}</td><td>{{ c.incomplete }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No methodology checklist was tracked for this engagement.</p>
+{% endif %}
+<p>Severity ratings use the CVSS v3.1 base score where a vector is provided:
+Critical 9.0-10.0, High 7.0-8.9, Medium 4.0-6.9, Low 0.1-3.9, Informational 0.0.</p>
+
+<h2 id="findings" class="pb">5. Detailed findings</h2>
+{% for f in findings %}
+<article class="finding" id="f-{{ f.id }}">
+  <div class="finding-head">
+    <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+    <h3><span class="mono muted">{{ f.ref }}</span> {{ f.title }}</h3>
+  </div>
+  <div class="finding-body">
+    <dl class="meta">
+      <dt>Status</dt><dd>{{ f.status|replace('_', ' ') }}</dd>
+      {% if f.cvss_vector %}<dt>CVSS v3.1</dt><dd><strong>{{ f.cvss_score }}</strong> <span class="mono">{{ f.cvss_vector }}</span></dd>{% endif %}
+      {% if f.cwe %}<dt>Weakness</dt><dd>{{ f.cwe }}</dd>{% endif %}
+      <dt>Affected assets</dt><dd class="mono">{{ f.targets|join(', ') if f.targets else 'See description' }}</dd>
+    </dl>
+    {% if f.description %}<h4>Description</h4><div class="text">{{ f.description }}</div>{% endif %}
+    {% if f.impact %}<h4>Impact</h4><div class="text">{{ f.impact }}</div>{% endif %}
+    {% if f.steps_to_reproduce %}<h4>Steps to reproduce</h4><div class="steps mono">{{ f.steps_to_reproduce }}</div>{% endif %}
+    {% if f.images or f.attachments %}
+    <h4>Evidence</h4>
+    <div class="evidence">
+      {% for img in f.images %}
+      <figure><img src="{{ img.data_uri }}" alt="{{ img.filename }}"><figcaption>{{ img.filename }}{% if img.description %} - {{ img.description }}{% endif %} (sha256 <span class="mono">{{ img.sha256[:16] }}</span>)</figcaption></figure>
+      {% endfor %}
+      {% if f.attachments %}
+      <table><thead><tr><th>File</th><th>Description</th><th>SHA-256</th></tr></thead><tbody>
+      {% for a in f.attachments %}<tr><td>{{ a.filename }}</td><td>{{ a.description }}</td><td class="mono hash">{{ a.sha256 }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if f.remediation %}<h4>Remediation</h4><div class="text">{{ f.remediation }}</div>{% endif %}
+    {% if f.references %}
+    <h4>References</h4>
+    <ul>{% for r in f.references %}<li class="mono" style="word-break:break-all">{{ r }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+</article>
+{% else %}
+<p class="muted">No findings were reported.</p>
+{% endfor %}
+
+<h2 id="appendix" class="pb">Appendix: assets in scope</h2>
+{% if targets %}
+<table>
+  <thead><tr><th>Asset</th><th>Hostname / IP</th><th>OS</th><th>Services</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for t in targets %}
+  <tr>
+    <td class="mono">{{ t.value }}</td>
+    <td class="mono">{{ t.hostname }}{% if t.hostname and t.ip %}<br>{% endif %}{{ t.ip if t.ip != t.value else '' }}</td>
+    <td>{{ t.os }}</td>
+    <td class="mono">{% for s in t.services %}{{ s }}<br>{% endfor %}</td>
+    <td>{{ t.status|replace('_', ' ') }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No in-scope assets recorded.</p>
+{% endif %}
+
+<h3 style="margin-top:32px">Assessment team</h3>
+<table><thead><tr><th>Name</th><th>Role</th><th>Email</th></tr></thead><tbody>
+{% for m in team %}<tr><td>{{ m.name }}</td><td>{{ m.role }}</td><td>{{ m.email }}</td></tr>{% endfor %}
+</tbody></table>
+
+<footer>{{ engagement.code }} · Generated by OffsecHub on {{ generated_at }} · Confidential</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# subfinder -d acme-corp.example
+www.acme-corp.example
+portal.acme-corp.example
+api.acme-corp.example
+vpn.acme-corp.example
+dev.acme-corp.example
+https://portal.acme-corp.example
+!!invalid-entry

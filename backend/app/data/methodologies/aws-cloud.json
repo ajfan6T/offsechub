@@ -1,0 +1,91 @@
+{
+  "id": "aws-cloud",
+  "name": "AWS Cloud Security Assessment",
+  "description": "Configuration review and attack-path testing of an AWS environment.",
+  "cases": [
+    {
+      "ref": "AWS-01",
+      "category": "Identity",
+      "title": "Root account usage, MFA and access keys",
+      "description": ""
+    },
+    {
+      "ref": "AWS-02",
+      "category": "Identity",
+      "title": "IAM users without MFA and stale access keys",
+      "description": ""
+    },
+    {
+      "ref": "AWS-03",
+      "category": "Identity",
+      "title": "Overly permissive IAM policies and privilege escalation paths",
+      "description": "iam:PassRole, policy version abuse, wildcard actions."
+    },
+    {
+      "ref": "AWS-04",
+      "category": "Identity",
+      "title": "Cross-account trust and external IDs on assumable roles",
+      "description": ""
+    },
+    {
+      "ref": "AWS-05",
+      "category": "Storage",
+      "title": "S3 buckets with public access or permissive policies",
+      "description": ""
+    },
+    {
+      "ref": "AWS-06",
+      "category": "Storage",
+      "title": "Public EBS/RDS snapshots and AMIs",
+      "description": ""
+    },
+    {
+      "ref": "AWS-07",
+      "category": "Compute",
+      "title": "IMDSv2 enforcement on EC2 instances",
+      "description": ""
+    },
+    {
+      "ref": "AWS-08",
+      "category": "Compute",
+      "title": "Secrets in user data, environment variables and Lambda configuration",
+      "description": ""
+    },
+    {
+      "ref": "AWS-09",
+      "category": "Network",
+      "title": "Security groups exposing management ports to 0.0.0.0/0",
+      "description": ""
+    },
+    {
+      "ref": "AWS-10",
+      "category": "Network",
+      "title": "Internet-exposed databases and services",
+      "description": ""
+    },
+    {
+      "ref": "AWS-11",
+      "category": "Logging",
+      "title": "CloudTrail enabled in all regions with log integrity validation",
+      "description": ""
+    },
+    {
+      "ref": "AWS-12",
+      "category": "Logging",
+      "title": "GuardDuty / Security Hub coverage",
+      "description": ""
+    },
+    {
+      "ref": "AWS-13",
+      "category": "Data",
+      "title": "Encryption at rest and KMS key policies",
+      "description": ""
+    },
+    {
+      "ref": "AWS-14",
+      "category": "Containers",
+      "title": "EKS/ECS cluster access and workload identity",
+      "description": ""
+    }
+  ]
+}

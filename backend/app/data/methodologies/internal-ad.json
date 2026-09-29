@@ -1,0 +1,133 @@
+{
+  "id": "internal-ad",
+  "name": "Internal Network & Active Directory",
+  "description": "Assumed-breach internal network and Active Directory assessment.",
+  "cases": [
+    {
+      "ref": "INT-01",
+      "category": "Discovery",
+      "title": "Host discovery and port scanning of internal ranges",
+      "description": ""
+    },
+    {
+      "ref": "INT-02",
+      "category": "Discovery",
+      "title": "Identify domain controllers and critical servers",
+      "description": ""
+    },
+    {
+      "ref": "INT-03",
+      "category": "Network Attacks",
+      "title": "LLMNR / NBT-NS / mDNS poisoning",
+      "description": ""
+    },
+    {
+      "ref": "INT-04",
+      "category": "Network Attacks",
+      "title": "SMB signing and NTLM relay opportunities",
+      "description": ""
+    },
+    {
+      "ref": "INT-05",
+      "category": "Network Attacks",
+      "title": "IPv6 / DHCPv6 (mitm6) attacks",
+      "description": ""
+    },
+    {
+      "ref": "INT-06",
+      "category": "Network Attacks",
+      "title": "Authentication coercion (PetitPotam, PrinterBug, DFSCoerce)",
+      "description": ""
+    },
+    {
+      "ref": "INT-07",
+      "category": "Active Directory",
+      "title": "Domain enumeration and attack path analysis (BloodHound)",
+      "description": ""
+    },
+    {
+      "ref": "INT-08",
+      "category": "Active Directory",
+      "title": "Kerberoasting",
+      "description": ""
+    },
+    {
+      "ref": "INT-09",
+      "category": "Active Directory",
+      "title": "AS-REP roasting",
+      "description": ""
+    },
+    {
+      "ref": "INT-10",
+      "category": "Active Directory",
+      "title": "Password policy review and password spraying",
+      "description": ""
+    },
+    {
+      "ref": "INT-11",
+      "category": "Active Directory",
+      "title": "AD Certificate Services misconfigurations (ESC1-ESC8)",
+      "description": ""
+    },
+    {
+      "ref": "INT-12",
+      "category": "Active Directory",
+      "title": "Delegation abuse (unconstrained, constrained, RBCD)",
+      "description": ""
+    },
+    {
+      "ref": "INT-13",
+      "category": "Active Directory",
+      "title": "ACL / DACL abuse paths",
+      "description": ""
+    },
+    {
+      "ref": "INT-14",
+      "category": "Active Directory",
+      "title": "Credentials in SYSVOL / GPP / shares",
+      "description": ""
+    },
+    {
+      "ref": "INT-15",
+      "category": "Active Directory",
+      "title": "LAPS deployment and local admin password reuse",
+      "description": ""
+    },
+    {
+      "ref": "INT-16",
+      "category": "Hosts",
+      "title": "Default credentials on internal services",
+      "description": "Printers, IPMI, databases, network devices."
+    },
+    {
+      "ref": "INT-17",
+      "category": "Hosts",
+      "title": "Missing patches and end-of-life systems",
+      "description": ""
+    },
+    {
+      "ref": "INT-18",
+      "category": "Hosts",
+      "title": "Local privilege escalation on compromised hosts",
+      "description": ""
+    },
+    {
+      "ref": "INT-19",
+      "category": "Post-Exploitation",
+      "title": "Lateral movement and domain privilege escalation",
+      "description": ""
+    },
+    {
+      "ref": "INT-20",
+      "category": "Post-Exploitation",
+      "title": "Access to crown-jewel systems and data",
+      "description": "Demonstrate business impact against agreed objectives."
+    },
+    {
+      "ref": "INT-21",
+      "category": "Detection",
+      "title": "Record detection and response events",
+      "description": "Note which activities were detected or blocked."
+    }
+  ]
+}

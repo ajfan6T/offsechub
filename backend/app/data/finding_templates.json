@@ -1,0 +1,156 @@
+[
+  {
+    "title": "SQL Injection",
+    "category": "Web Application",
+    "severity": "critical",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "cwe": "CWE-89",
+    "description": "The application builds SQL queries by concatenating user-controlled input without parameterisation. An attacker can alter the structure of the query sent to the database.",
+    "impact": "An unauthenticated attacker can read, modify or delete data in the backend database, bypass authentication, and depending on the database configuration execute operating system commands on the database server.",
+    "remediation": "Use parameterised queries (prepared statements) or a safe ORM API for every database call. Never build SQL from string concatenation. Apply least privilege to the database account used by the application and validate input against an allow-list where possible.",
+    "references": "https://owasp.org/www-community/attacks/SQL_Injection\nhttps://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html\nhttps://cwe.mitre.org/data/definitions/89.html"
+  },
+  {
+    "title": "Reflected Cross-Site Scripting (XSS)",
+    "category": "Web Application",
+    "severity": "medium",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+    "cwe": "CWE-79",
+    "description": "User-supplied input is reflected into the HTML response without context-appropriate output encoding, allowing injection of arbitrary JavaScript that executes in the victim's browser.",
+    "impact": "An attacker who convinces a user to follow a crafted link can execute script in the context of the application: stealing session data not protected by HttpOnly, performing actions as the victim, or presenting fraudulent content.",
+    "remediation": "Encode all untrusted data for the output context (HTML body, attribute, JavaScript, URL). Prefer frameworks that auto-escape by default. Deploy a restrictive Content-Security-Policy as defence in depth.",
+    "references": "https://owasp.org/www-community/attacks/xss/\nhttps://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+  },
+  {
+    "title": "Stored Cross-Site Scripting (XSS)",
+    "category": "Web Application",
+    "severity": "high",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:L/A:N",
+    "cwe": "CWE-79",
+    "description": "Input submitted by one user is stored by the application and later rendered to other users without output encoding, so injected script runs in every viewer's browser.",
+    "impact": "Script executes automatically for every user who views the affected page, including administrators, enabling account takeover and actions performed on behalf of victims at scale.",
+    "remediation": "Apply context-aware output encoding when rendering stored data, sanitise any user-supplied HTML with a maintained allow-list sanitiser, and deploy a restrictive Content-Security-Policy.",
+    "references": "https://owasp.org/www-community/attacks/xss/\nhttps://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+  },
+  {
+    "title": "Insecure Direct Object Reference (IDOR)",
+    "category": "Web Application",
+    "severity": "high",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+    "cwe": "CWE-639",
+    "description": "The application uses client-supplied identifiers to access objects without verifying that the authenticated user is authorised to access that specific object.",
+    "impact": "An authenticated user can read or modify data belonging to other users or tenants by changing an identifier in the request.",
+    "remediation": "Enforce object-level authorisation on the server for every request that references an object, deriving ownership from the authenticated session rather than from client input. Add automated tests for cross-user access.",
+    "references": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/\nhttps://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html"
+  },
+  {
+    "title": "Server-Side Request Forgery (SSRF)",
+    "category": "Web Application",
+    "severity": "high",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N",
+    "cwe": "CWE-918",
+    "description": "The application fetches a URL supplied by the user from the server side without restricting the destination.",
+    "impact": "An attacker can make the server send requests to internal services and cloud metadata endpoints, potentially exposing credentials and internal data or pivoting into the internal network.",
+    "remediation": "Allow-list permitted destinations, resolve and validate the target IP after DNS resolution, block private, loopback and link-local ranges, disable redirects, and require IMDSv2 on cloud instances.",
+    "references": "https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/\nhttps://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+  },
+  {
+    "title": "Missing HTTP Security Headers",
+    "category": "Web Application",
+    "severity": "low",
+    "cvss_vector": "",
+    "cwe": "CWE-693",
+    "description": "Responses do not set one or more recommended security headers such as Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options or frame-ancestors / X-Frame-Options.",
+    "impact": "The absence of these headers removes browser-side defence in depth, increasing the impact of other vulnerabilities such as XSS, clickjacking and protocol downgrade.",
+    "remediation": "Configure the web server or application framework to emit a restrictive Content-Security-Policy, Strict-Transport-Security with an appropriate max-age, X-Content-Type-Options: nosniff and frame-ancestors 'none' (or 'self').",
+    "references": "https://owasp.org/www-project-secure-headers/\nhttps://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html"
+  },
+  {
+    "title": "Weak TLS Configuration",
+    "category": "Infrastructure",
+    "severity": "medium",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-326",
+    "description": "The service accepts deprecated protocol versions (SSLv3, TLS 1.0 or TLS 1.1) and/or weak cipher suites.",
+    "impact": "A network-positioned attacker may be able to downgrade or weaken the encrypted channel, increasing the risk of traffic interception.",
+    "remediation": "Disable SSLv3, TLS 1.0 and TLS 1.1. Support TLS 1.2 with AEAD cipher suites and TLS 1.3. Use a maintained configuration baseline such as the Mozilla server-side TLS guidelines.",
+    "references": "https://wiki.mozilla.org/Security/Server_Side_TLS\nhttps://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html"
+  },
+  {
+    "title": "Default or Weak Credentials",
+    "category": "Infrastructure",
+    "severity": "critical",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "cwe": "CWE-1392",
+    "description": "An administrative interface or service accepted vendor-default or trivially guessable credentials.",
+    "impact": "An unauthenticated attacker can take full administrative control of the affected system.",
+    "remediation": "Change all default credentials before deployment, enforce a strong password policy, restrict management interfaces to administrative networks and enable multi-factor authentication where supported.",
+    "references": "https://cwe.mitre.org/data/definitions/1392.html"
+  },
+  {
+    "title": "SMB Signing Not Required",
+    "category": "Active Directory",
+    "severity": "medium",
+    "cvss_vector": "CVSS:3.1/AV:A/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+    "cwe": "CWE-294",
+    "description": "Hosts on the internal network do not require SMB message signing.",
+    "impact": "An attacker on the internal network who can coerce or capture authentication (for example through LLMNR/NBT-NS poisoning) can relay NTLM authentication to these hosts and execute code or access files as the relayed user.",
+    "remediation": "Enable 'Microsoft network server: Digitally sign communications (always)' via Group Policy for all workstations and servers, and prioritise domain controllers and file servers.",
+    "references": "https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/microsoft-network-server-digitally-sign-communications-always"
+  },
+  {
+    "title": "LLMNR / NBT-NS Poisoning",
+    "category": "Active Directory",
+    "severity": "medium",
+    "cvss_vector": "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-300",
+    "description": "Hosts fall back to Link-Local Multicast Name Resolution and NetBIOS Name Service when DNS fails, and trust any responder on the local segment.",
+    "impact": "An attacker on the local network can answer these broadcast queries, capture NetNTLMv2 hashes for offline cracking, or relay authentication to other hosts.",
+    "remediation": "Disable LLMNR via Group Policy ('Turn off multicast name resolution') and disable NetBIOS over TCP/IP on all interfaces (DHCP option or adapter settings).",
+    "references": "https://attack.mitre.org/techniques/T1557/001/"
+  },
+  {
+    "title": "Kerberoastable Service Accounts",
+    "category": "Active Directory",
+    "severity": "high",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+    "cwe": "CWE-521",
+    "description": "User accounts with Service Principal Names set have weak passwords, allowing any domain user to request service tickets and crack them offline.",
+    "impact": "Any authenticated domain user can recover the plaintext password of the affected service accounts, which frequently hold elevated privileges.",
+    "remediation": "Use Group Managed Service Accounts where possible. Otherwise set long (25+ character) random passwords on SPN-bearing accounts, prefer AES encryption types, remove unnecessary SPNs and monitor for anomalous TGS requests.",
+    "references": "https://attack.mitre.org/techniques/T1558/003/"
+  },
+  {
+    "title": "Outdated Software with Known Vulnerabilities",
+    "category": "Infrastructure",
+    "severity": "high",
+    "cvss_vector": "",
+    "cwe": "CWE-1104",
+    "description": "The identified service is running a version that is no longer supported or has publicly disclosed vulnerabilities.",
+    "impact": "Publicly known vulnerabilities often have working exploits available, lowering the skill required to compromise the system.",
+    "remediation": "Upgrade to a supported, patched release. Establish a patch management process with defined SLAs and maintain an accurate software inventory.",
+    "references": "https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/"
+  },
+  {
+    "title": "Publicly Accessible Cloud Storage Bucket",
+    "category": "Cloud",
+    "severity": "high",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-284",
+    "description": "A cloud object storage bucket allows anonymous listing and/or reading of objects.",
+    "impact": "Anyone on the internet can enumerate and download the stored data.",
+    "remediation": "Enable account-level public access blocking, remove public ACLs and bucket policies granting access to anonymous principals, and review bucket contents for exposed sensitive data.",
+    "references": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+  },
+  {
+    "title": "Username Enumeration",
+    "category": "Web Application",
+    "severity": "low",
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+    "cwe": "CWE-204",
+    "description": "The login, registration or password reset functionality responds differently for valid and invalid usernames.",
+    "impact": "An attacker can build a list of valid accounts to target with password spraying or phishing.",
+    "remediation": "Return identical responses, status codes and timing for valid and invalid accounts, and combine with rate limiting and account lockout monitoring.",
+    "references": "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account"
+  }
+]

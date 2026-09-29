@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -O -oX nmap-acme.xml 203.0.113.0/28" start="1790000000" version="7.95" xmloutputversion="1.05">
+  <host>
+    <status state="up" reason="echo-reply"/>
+    <address addr="203.0.113.10" addrtype="ipv4"/>
+    <hostnames><hostname name="www.acme-corp.example" type="PTR"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="22"><state state="open" reason="syn-ack"/><service name="ssh" product="OpenSSH" version="8.2p1 Ubuntu 4ubuntu0.5" extrainfo="Ubuntu Linux; protocol 2.0"/></port>
+      <port protocol="tcp" portid="80"><state state="open" reason="syn-ack"/><service name="http" product="nginx" version="1.18.0"/></port>
+      <port protocol="tcp" portid="443"><state state="open" reason="syn-ack"/><service name="https" product="nginx" version="1.18.0" tunnel="ssl"/></port>
+      <port protocol="tcp" portid="8080"><state state="closed" reason="reset"/><service name="http-proxy"/></port>
+    </ports>
+    <os><osmatch name="Linux 5.4" accuracy="95"/><osmatch name="Linux 4.15" accuracy="90"/></os>
+  </host>
+  <host>
+    <status state="up" reason="echo-reply"/>
+    <address addr="203.0.113.11" addrtype="ipv4"/>
+    <hostnames><hostname name="vpn.acme-corp.example" type="PTR"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="443"><state state="open" reason="syn-ack"/><service name="https" product="Fortinet SSL VPN"/></port>
+      <port protocol="udp" portid="500"><state state="open|filtered" reason="no-response"/><service name="isakmp"/></port>
+    </ports>
+  </host>
+  <host>
+    <status state="up" reason="echo-reply"/>
+    <address addr="203.0.113.12" addrtype="ipv4"/>
+    <hostnames><hostname name="mail.acme-corp.example" type="PTR"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="25"><state state="open" reason="syn-ack"/><service name="smtp" product="Postfix smtpd"/></port>
+      <port protocol="tcp" portid="3389"><state state="open" reason="syn-ack"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port>
+    </ports>
+  </host>
+  <host>
+    <status state="down" reason="no-response"/>
+    <address addr="203.0.113.13" addrtype="ipv4"/>
+  </host>
+  <host>
+    <status state="up" reason="echo-reply"/>
+    <address addr="198.51.100.7" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="443"><state state="open" reason="syn-ack"/><service name="https" product="cloudflare"/></port>
+    </ports>
+  </host>
+</nmaprun>

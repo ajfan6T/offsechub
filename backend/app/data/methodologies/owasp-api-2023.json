@@ -1,0 +1,79 @@
+{
+  "id": "owasp-api-2023",
+  "name": "OWASP API Security Top 10 (2023)",
+  "description": "API-focused checks aligned with the OWASP API Security Top 10 2023.",
+  "cases": [
+    {
+      "ref": "API1:2023",
+      "category": "Authorization",
+      "title": "Broken object level authorization",
+      "description": "Swap object IDs across users and tenants on every endpoint."
+    },
+    {
+      "ref": "API2:2023",
+      "category": "Authentication",
+      "title": "Broken authentication",
+      "description": "Token validation, JWT algorithm confusion, credential stuffing protection, token lifetime."
+    },
+    {
+      "ref": "API3:2023",
+      "category": "Authorization",
+      "title": "Broken object property level authorization",
+      "description": "Excessive data exposure and mass assignment of protected properties."
+    },
+    {
+      "ref": "API4:2023",
+      "category": "Resource Consumption",
+      "title": "Unrestricted resource consumption",
+      "description": "Rate limits, pagination limits, payload size, expensive queries."
+    },
+    {
+      "ref": "API5:2023",
+      "category": "Authorization",
+      "title": "Broken function level authorization",
+      "description": "Call admin or privileged functions as a low-privilege user."
+    },
+    {
+      "ref": "API6:2023",
+      "category": "Business Logic",
+      "title": "Unrestricted access to sensitive business flows",
+      "description": "Automation abuse of purchase, sign-up, referral flows."
+    },
+    {
+      "ref": "API7:2023",
+      "category": "Input Validation",
+      "title": "Server side request forgery",
+      "description": "URL parameters, webhooks, file imports fetching remote resources."
+    },
+    {
+      "ref": "API8:2023",
+      "category": "Configuration",
+      "title": "Security misconfiguration",
+      "description": "CORS, verbose errors, missing TLS, unnecessary HTTP methods."
+    },
+    {
+      "ref": "API9:2023",
+      "category": "Inventory",
+      "title": "Improper inventory management",
+      "description": "Old API versions, undocumented endpoints, non-production hosts exposed."
+    },
+    {
+      "ref": "API10:2023",
+      "category": "Integrations",
+      "title": "Unsafe consumption of APIs",
+      "description": "Trust placed in third-party API responses and redirects."
+    },
+    {
+      "ref": "API-GQL-01",
+      "category": "GraphQL",
+      "title": "GraphQL introspection and query depth/complexity",
+      "description": "Introspection exposure, batching abuse, deep nesting DoS."
+    },
+    {
+      "ref": "API-JWT-01",
+      "category": "Authentication",
+      "title": "JWT handling",
+      "description": "alg=none, weak HMAC secrets, kid injection, missing exp/aud checks."
+    }
+  ]
+}

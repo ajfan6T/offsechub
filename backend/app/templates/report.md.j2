@@ -1,0 +1,159 @@
+# {{ client.name }}: {{ engagement.name }}
+
+**{{ engagement.type }}** · Reference `{{ engagement.code }}`
+{% if engagement.start_date %}
+Testing window: {{ engagement.start_date }}{% if engagement.end_date %} to {{ engagement.end_date }}{% endif %}
+
+{% endif %}
+Generated {{ generated_at }} by {{ generated_by }}
+{% if draft %}
+
+> **DRAFT** - not for distribution
+{% endif %}
+
+---
+
+## 1. Executive summary
+
+{{ engagement.executive_summary or "_No executive summary has been written yet._" }}
+{% if engagement.description %}
+
+### Engagement background
+
+{{ engagement.description }}
+{% endif %}
+
+## 2. Findings overview
+
+| Severity | Count |
+|---|---|
+{% for sev, n in severity_counts.items() %}
+| {{ sev|capitalize }} | {{ n }} |
+{% endfor %}
+
+{% if findings %}
+| Ref | Title | Severity | CVSS | Status | Affected |
+|---|---|---|---|---|---|
+{% for f in findings %}
+| {{ f.ref }} | {{ f.title|cell }} | {{ f.severity|capitalize }} | {{ f.cvss_score if f.cvss_score is not none else "-" }} | {{ f.status|replace("_", " ") }} | {{ f.targets|length }} |
+{% endfor %}
+{% endif %}
+
+## 3. Scope and rules of engagement
+
+### In scope
+
+{% for s in scope.include %}
+- `{{ s.value }}` ({{ s.kind }}){% if s.notes %}: {{ s.notes }}{% endif %}
+
+{% else %}
+_No scope recorded._
+{% endfor %}
+{% if scope.exclude %}
+
+### Explicitly excluded
+
+{% for s in scope.exclude %}
+- `{{ s.value }}` ({{ s.kind }}){% if s.notes %}: {{ s.notes }}{% endif %}
+
+{% endfor %}
+{% endif %}
+{% if engagement.rules_of_engagement %}
+
+### Rules of engagement
+
+{{ engagement.rules_of_engagement }}
+{% endif %}
+
+## 4. Methodology and coverage
+
+{% if coverage %}
+| Methodology | Checks | Passed | Vulnerable | N/A | Blocked | Not completed |
+|---|---|---|---|---|---|---|
+{% for c in coverage %}
+| {{ c.methodology|cell }} | {{ c.total }} | {{ c.passed }} | {{ c.failed }} | {{ c.not_applicable }} | {{ c.blocked }} | {{ c.incomplete }} |
+{% endfor %}
+{% else %}
+_No methodology checklist was tracked for this engagement._
+{% endif %}
+
+## 5. Detailed findings
+
+{% for f in findings %}
+### {{ f.ref }}: {{ f.title }}
+
+| | |
+|---|---|
+| Severity | **{{ f.severity|capitalize }}** |
+| Status | {{ f.status|replace("_", " ") }} |
+{% if f.cvss_vector %}
+| CVSS v3.1 | {{ f.cvss_score }} (`{{ f.cvss_vector }}`) |
+{% endif %}
+{% if f.cwe %}
+| Weakness | {{ f.cwe }} |
+{% endif %}
+| Affected | {{ f.targets|join(", ")|cell if f.targets else "See description" }} |
+
+{% if f.description %}
+#### Description
+
+{{ f.description }}
+
+{% endif %}
+{% if f.impact %}
+#### Impact
+
+{{ f.impact }}
+
+{% endif %}
+{% if f.steps_to_reproduce %}
+#### Steps to reproduce
+
+```
+{{ f.steps_to_reproduce }}
+```
+
+{% endif %}
+{% if f.images or f.attachments %}
+#### Evidence
+
+{% for e in f.images + f.attachments %}
+- {{ e.filename }}{% if e.description %}: {{ e.description }}{% endif %} (sha256 `{{ e.sha256 }}`)
+{% endfor %}
+
+{% endif %}
+{% if f.remediation %}
+#### Remediation
+
+{{ f.remediation }}
+
+{% endif %}
+{% if f.references %}
+#### References
+
+{% for r in f.references %}
+- {{ r }}
+{% endfor %}
+
+{% endif %}
+{% else %}
+_No findings were reported._
+{% endfor %}
+
+## Appendix: assets in scope
+
+{% if targets %}
+| Asset | Hostname | IP | OS | Services |
+|---|---|---|---|---|
+{% for t in targets %}
+| `{{ t.value }}` | {{ t.hostname|cell }} | {{ t.ip }} | {{ t.os|cell }} | {{ t.services|join("; ")|cell }} |
+{% endfor %}
+{% else %}
+_No in-scope assets recorded._
+{% endif %}
+
+### Assessment team
+
+{% for m in team %}
+- {{ m.name }} ({{ m.role }})
+{% endfor %}

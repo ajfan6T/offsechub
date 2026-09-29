@@ -1,0 +1,331 @@
+{
+  "id": "owasp-wstg",
+  "name": "OWASP WSTG - Web Application",
+  "description": "Core checks from the OWASP Web Security Testing Guide v4.2.",
+  "cases": [
+    {
+      "ref": "WSTG-INFO-02",
+      "category": "Information Gathering",
+      "title": "Fingerprint web server",
+      "description": "Identify server software and version from banners, headers and behaviour."
+    },
+    {
+      "ref": "WSTG-INFO-03",
+      "category": "Information Gathering",
+      "title": "Review webserver metafiles for information leakage",
+      "description": "robots.txt, sitemap.xml, security.txt, .well-known."
+    },
+    {
+      "ref": "WSTG-INFO-05",
+      "category": "Information Gathering",
+      "title": "Review webpage content for information leakage",
+      "description": "Comments, metadata, JavaScript source maps, hard-coded secrets."
+    },
+    {
+      "ref": "WSTG-INFO-06",
+      "category": "Information Gathering",
+      "title": "Identify application entry points",
+      "description": "Map parameters, headers, cookies and request methods."
+    },
+    {
+      "ref": "WSTG-INFO-08",
+      "category": "Information Gathering",
+      "title": "Fingerprint web application framework",
+      "description": "Framework, CMS and library versions."
+    },
+    {
+      "ref": "WSTG-CONF-02",
+      "category": "Configuration & Deployment",
+      "title": "Test application platform configuration",
+      "description": "Default files, debug modes, verbose errors, sample apps."
+    },
+    {
+      "ref": "WSTG-CONF-04",
+      "category": "Configuration & Deployment",
+      "title": "Review old backup and unreferenced files",
+      "description": "Backup copies, .git/.svn exposure, archives."
+    },
+    {
+      "ref": "WSTG-CONF-05",
+      "category": "Configuration & Deployment",
+      "title": "Enumerate infrastructure and application admin interfaces",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CONF-06",
+      "category": "Configuration & Deployment",
+      "title": "Test HTTP methods",
+      "description": "TRACE, PUT, DELETE, method override headers."
+    },
+    {
+      "ref": "WSTG-CONF-07",
+      "category": "Configuration & Deployment",
+      "title": "Test HTTP Strict Transport Security",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CONF-10",
+      "category": "Configuration & Deployment",
+      "title": "Test for subdomain takeover",
+      "description": "Dangling DNS records pointing at deprovisioned services."
+    },
+    {
+      "ref": "WSTG-CONF-11",
+      "category": "Configuration & Deployment",
+      "title": "Test cloud storage",
+      "description": "Public buckets or blobs referenced by the application."
+    },
+    {
+      "ref": "WSTG-IDNT-01",
+      "category": "Identity Management",
+      "title": "Test role definitions",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-IDNT-02",
+      "category": "Identity Management",
+      "title": "Test user registration process",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-IDNT-04",
+      "category": "Identity Management",
+      "title": "Test for account enumeration and guessable user accounts",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-01",
+      "category": "Authentication",
+      "title": "Test for credentials transported over an encrypted channel",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-02",
+      "category": "Authentication",
+      "title": "Test for default credentials",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-03",
+      "category": "Authentication",
+      "title": "Test for weak lock out mechanism",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-04",
+      "category": "Authentication",
+      "title": "Test for bypassing authentication schema",
+      "description": "Forced browsing, parameter tampering, session ID prediction."
+    },
+    {
+      "ref": "WSTG-ATHN-07",
+      "category": "Authentication",
+      "title": "Test for weak password policy",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-09",
+      "category": "Authentication",
+      "title": "Test for weak password change or reset functionalities",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHN-10",
+      "category": "Authentication",
+      "title": "Test for weaker authentication in alternative channel",
+      "description": "Mobile apps, APIs, legacy endpoints without MFA."
+    },
+    {
+      "ref": "WSTG-ATHZ-01",
+      "category": "Authorization",
+      "title": "Test directory traversal / file include",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHZ-02",
+      "category": "Authorization",
+      "title": "Test for bypassing authorization schema",
+      "description": "Horizontal and vertical access control across roles."
+    },
+    {
+      "ref": "WSTG-ATHZ-03",
+      "category": "Authorization",
+      "title": "Test for privilege escalation",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ATHZ-04",
+      "category": "Authorization",
+      "title": "Test for insecure direct object references",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-SESS-01",
+      "category": "Session Management",
+      "title": "Test session management schema",
+      "description": "Token entropy, predictability, lifetime."
+    },
+    {
+      "ref": "WSTG-SESS-02",
+      "category": "Session Management",
+      "title": "Test cookie attributes",
+      "description": "Secure, HttpOnly, SameSite, Domain, Path."
+    },
+    {
+      "ref": "WSTG-SESS-03",
+      "category": "Session Management",
+      "title": "Test for session fixation",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-SESS-05",
+      "category": "Session Management",
+      "title": "Test for cross-site request forgery",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-SESS-06",
+      "category": "Session Management",
+      "title": "Test logout functionality",
+      "description": "Server-side invalidation of the session."
+    },
+    {
+      "ref": "WSTG-SESS-07",
+      "category": "Session Management",
+      "title": "Test session timeout",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-01",
+      "category": "Input Validation",
+      "title": "Test for reflected cross-site scripting",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-02",
+      "category": "Input Validation",
+      "title": "Test for stored cross-site scripting",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-05",
+      "category": "Input Validation",
+      "title": "Test for SQL injection",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-07",
+      "category": "Input Validation",
+      "title": "Test for XML injection (incl. XXE)",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-11",
+      "category": "Input Validation",
+      "title": "Test for code injection",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-12",
+      "category": "Input Validation",
+      "title": "Test for command injection",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-15",
+      "category": "Input Validation",
+      "title": "Test for HTTP splitting and smuggling",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-17",
+      "category": "Input Validation",
+      "title": "Test for host header injection",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-18",
+      "category": "Input Validation",
+      "title": "Test for server-side template injection",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-INPV-19",
+      "category": "Input Validation",
+      "title": "Test for server-side request forgery",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-ERRH-01",
+      "category": "Error Handling",
+      "title": "Test for improper error handling",
+      "description": "Stack traces, verbose database errors."
+    },
+    {
+      "ref": "WSTG-CRYP-01",
+      "category": "Cryptography",
+      "title": "Test for weak transport layer security",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CRYP-03",
+      "category": "Cryptography",
+      "title": "Test for sensitive information sent via unencrypted channels",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-BUSL-01",
+      "category": "Business Logic",
+      "title": "Test business logic data validation",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-BUSL-05",
+      "category": "Business Logic",
+      "title": "Test number of times a function can be used (limits)",
+      "description": "Rate limits, coupon reuse, race conditions."
+    },
+    {
+      "ref": "WSTG-BUSL-06",
+      "category": "Business Logic",
+      "title": "Test for the circumvention of work flows",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-BUSL-09",
+      "category": "Business Logic",
+      "title": "Test upload of malicious files",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CLNT-01",
+      "category": "Client-side",
+      "title": "Test for DOM-based cross-site scripting",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CLNT-04",
+      "category": "Client-side",
+      "title": "Test for client-side URL redirect",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CLNT-07",
+      "category": "Client-side",
+      "title": "Test cross-origin resource sharing",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CLNT-09",
+      "category": "Client-side",
+      "title": "Test for clickjacking",
+      "description": ""
+    },
+    {
+      "ref": "WSTG-CLNT-12",
+      "category": "Client-side",
+      "title": "Test browser storage",
+      "description": "Tokens or PII in localStorage/sessionStorage/IndexedDB."
+    }
+  ]
+}
