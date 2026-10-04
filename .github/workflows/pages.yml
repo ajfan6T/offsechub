@@ -59,10 +59,10 @@ jobs:
           URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           for i in $(seq 1 30); do
-            curl -fsS "$URL" | grep -q "<title>OffsecHub</title>" && break
+            curl -fsS "$URL" -o page.html && grep -q "<title>OffsecHub</title>" page.html && break
             sleep 5
           done
-          curl -fsS "$URL" | grep -q "<title>OffsecHub</title>"
+          grep -q "<title>OffsecHub</title>" page.html
           for path in fonts/MartianMono-var.woff2 screenshots/dashboard.png; do
             curl -fsS -o /dev/null -w "%{http_code} $URL$path\n" "$URL$path"
           done
