@@ -20,5 +20,6 @@ APP="$TMP/Applications/OffsecHub.app"
 codesign --verify --deep --strict "$APP"
 details="$(codesign --display --verbose=2 "$APP" 2>&1)"
 echo "$details" | grep -E "^(Authority|TeamIdentifier|Runtime Version|flags)|flags=" || true
-grep -q "(runtime)" <<< "$details" || { echo "the app is not signed with the hardened runtime" >&2; exit 1; }
+# e.g. "flags=0x10002(adhoc,runtime)" or "flags=0x10000(runtime)"
+grep -Eq 'flags=0x[0-9a-f]+\([^)]*runtime' <<< "$details" || { echo "the app is not signed with the hardened runtime" >&2; exit 1; }
 python packaging/smoke_test.py --app "$APP/Contents/MacOS/offsechub"
