@@ -84,7 +84,7 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 
 | Threat | Control | Proof |
 |---|---|---|
-| Stored XSS via scanner output or evidence | React escaping; a CSP with no inline script; evidence never rendered as HTML (only raster images inline; everything else a sandboxed attachment); reports autoescaped and served with a no-script CSP; the report preview iframe fully sandboxed. | report escaping tests, `test_active_content_is_never_served_inline` |
+| Stored XSS via scanner output or evidence | React escaping; a CSP with no inline script; evidence never rendered as HTML (only raster images inline; everything else a sandboxed attachment); reports autoescaped and served with a no-script CSP; the report preview iframe fully sandboxed. | report escaping tests, `test_only_raster_images_are_served_inline` |
 | XSS escalating to the host through the JS bridge | pywebview dispatches dotted attribute paths without an allow-list (`fn.__globals__…`). OffsecHub **patches the dispatcher** so only two flat method names are callable (native folder dialogs), and those hold no references to the vault. | `test_desktop.py` bridge tests |
 | Hostile XML in imports | `defusedxml`, which rejects entity expansion and external entities. | `test_xml_entity_expansion_is_rejected`, `test_external_entities_are_rejected` |
 

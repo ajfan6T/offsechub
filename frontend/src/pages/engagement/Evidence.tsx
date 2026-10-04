@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
-import { Button, Card, ConfirmButton, CopyButton, Empty, Field, Lightbox, Loading, useApiMutation } from "../../components/ui";
+import { Button, Card, ConfirmButton, CopyButton, DownloadLink, Empty, Field, Lightbox, Loading, useApiMutation } from "../../components/ui";
 import { fmtBytes, fmtDateTime } from "../../lib/format";
 import type { Evidence } from "../../types";
 import { evidenceImages, evidenceUrl, uploadEvidence, useEngagement, useFindings, useTargets } from "./context";
@@ -76,9 +76,9 @@ export function EvidencePage() {
           <Button disabled={!text.content} loading={paste.isPending} onClick={() => paste.mutate(undefined)}>Save text evidence</Button>
         </Card>
         <p className="muted small">
-          Each file is encrypted into the vault as it streams in and hashed (SHA-256) for chain of custody. Images render
-          inline in the report; everything else is listed with its hash. Active content (HTML, SVG) is only ever served as
-          a download.
+          Each file is encrypted into the vault as it streams in, and its SHA-256 is recorded so you and your client can
+          check that a file is the one the report cites. Images render inline in the report; everything else is listed
+          with its hash. Active content (HTML, SVG) is only ever served as a download.
         </p>
       </div>
       <Card
@@ -107,7 +107,7 @@ export function EvidencePage() {
                   <div className="thumb file-icon">{e.filename.split(".").pop()?.toUpperCase().slice(0, 5)}</div>
                 )}
                 <div className="evidence-meta">
-                  <a className="strong small" href={evidenceUrl(base, e)} download>{e.filename}</a>
+                  <DownloadLink className="strong small" href={evidenceUrl(base, e)} filename={e.filename}>{e.filename}</DownloadLink>
                   {e.description && <div className="small">{e.description}</div>}
                   <div className="muted small">
                     {fmtBytes(e.size)} · {fmtDateTime(e.created_at)}

@@ -39,21 +39,44 @@ export function SetPassword({ typedRecoveryKey }: { typedRecoveryKey: string | n
     <VaultScreen title="Set a new password" subtitle={`${status.name} was unlocked with its recovery key.`}>
       <form className="gate-form" onSubmit={submit}>
         <p className="muted small">
-          Choose a new password before continuing. A new recovery key is generated at the same time, and the one you just
-          used stops working.
+          Choose a new password before continuing. A new recovery key is generated at the same time, and the one you
+          just used stops working.
         </p>
         {!typedRecoveryKey && (
           <Field label="Recovery key">
-            <input className="mono" value={recoveryKey} onChange={(e) => setRecoveryKey(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
+            <input
+              className="mono"
+              value={recoveryKey}
+              onChange={(e) => setRecoveryKey(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              autoFocus
+            />
           </Field>
         )}
-        <NewPasswordFields label="New password" value={password} onChange={setPassword} autoFocus={!!typedRecoveryKey} />
+        <NewPasswordFields
+          label="New password"
+          value={password}
+          onChange={setPassword}
+          autoFocus={!!typedRecoveryKey}
+        />
         {error && <div className="alert alert-error">{error}</div>}
-        <Button variant="primary" type="submit" className="btn-block" loading={busy} disabled={!recoveryKey || !isValidNewPassword(password)}>
+        <Button
+          variant="primary"
+          type="submit"
+          className="btn-block"
+          loading={busy}
+          disabled={!recoveryKey || !isValidNewPassword(password)}
+        >
           Set password
         </Button>
         <div className="gate-links">
-          <button type="button" className="link small" disabled={lockVault.isPending} onClick={() => lockVault.mutate(undefined)}>
+          <button
+            type="button"
+            className="link small"
+            disabled={lockVault.isPending}
+            onClick={() => lockVault.mutate(undefined)}
+          >
             Lock the vault instead
           </button>
         </div>

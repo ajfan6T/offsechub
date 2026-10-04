@@ -49,12 +49,20 @@ class LocalAuth:
         self._launch_token: str | None = None
         self.allowed_hosts: set[str] = set()
         self.allowed_origins: set[str] = set()
+        self.cookie_name = COOKIE_NAME
         self.cookie_secure = False
 
-    def bind(self, port: int) -> None:
-        hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    def bind(self, port: int, extra_hosts: tuple[str, ...] = ()) -> None:
+        """Accept only our own origin (plus ``extra_hosts``, e.g. the Vite dev server).
+
+        Browsers scope cookies by host, not port, so the cookie name carries the
+        port: two instances in one browser (``--browser``) don't overwrite each
+        other's sessions.
+        """
+        hosts = {f"127.0.0.1:{port}", f"localhost:{port}", *extra_hosts}
         self.allowed_hosts = hosts
         self.allowed_origins = {f"http://{h}" for h in hosts}
+        self.cookie_name = f"{COOKIE_NAME}_{port}"
 
     def new_launch_token(self) -> str:
         """Issue a fresh single-use launch token (invalidates any unused one)."""
@@ -79,7 +87,7 @@ class LocalAuth:
         cookie = headers.get("cookie", "")
         for part in cookie.split(";"):
             name, _, value = part.strip().partition("=")
-            if name == COOKIE_NAME and _eq(value, self.session_secret):
+            if name == self.cookie_name and _eq(value, self.session_secret):
                 return "cookie"
         return None
 
@@ -115,7 +123,7 @@ class LocalAuthMiddleware:
             token = parse_qs(scope.get("query_string", b"").decode()).get("token", [None])[0]
             if method == "GET" and self.auth.consume_launch_token(token):
                 resp: Response = RedirectResponse("/", status_code=303)
-                resp.set_cookie(COOKIE_NAME, self.auth.session_secret, httponly=True,
+                resp.set_cookie(self.auth.cookie_name, self.auth.session_secret, httponly=True,
                                 samesite="strict", secure=self.auth.cookie_secure, path="/")
                 resp.headers["Referrer-Policy"] = "no-referrer"
                 resp.headers["Cache-Control"] = "no-store"

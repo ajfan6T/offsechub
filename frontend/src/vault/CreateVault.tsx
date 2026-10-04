@@ -41,10 +41,18 @@ export function CreateVault({ onCancel }: { onCancel: () => void }) {
   return (
     <VaultScreen title="Create a vault" subtitle="One vault per client, year or engagement: your call." wide>
       <form className="gate-form" onSubmit={submit}>
-        <Field label="Vault name" hint="The folder name is visible on disk. Use a code name if the client's identity is sensitive.">
+        <Field
+          label="Vault name"
+          hint="The folder name is visible on disk. Use a code name if the client's identity is sensitive."
+        >
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ACME-2026" autoFocus />
         </Field>
-        <PathField label="Location" value={dir} onChange={setFolder} pick={bridge ? () => bridge.pick_folder() : undefined} />
+        <PathField
+          label="Location"
+          value={dir}
+          onChange={setFolder}
+          pick={bridge ? () => bridge.pick_folder() : undefined}
+        />
         {path && (
           <p className="small muted">
             Creates <span className="mono">{path}</span>

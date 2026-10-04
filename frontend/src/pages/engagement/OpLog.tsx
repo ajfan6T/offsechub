@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
-import { Badge, Button, Card, ConfirmButton, Empty, Field, Loading, useApiMutation } from "../../components/ui";
+import { Badge, Button, Card, ConfirmButton, DownloadLink, Empty, Field, Loading, useApiMutation } from "../../components/ui";
 import { fmtDateTime } from "../../lib/format";
 import type { OplogEntry, OplogOutcome } from "../../types";
 import { useProfile } from "../../vault/context";
@@ -82,7 +82,7 @@ export function OpLog() {
       </Card>
       <Card
         title={`Timeline (${q.data?.length ?? 0})`}
-        actions={<a className="btn btn-secondary btn-sm" href={`${base}/oplog/export.csv`} download={`${engagement.code}-oplog.csv`}>Export CSV</a>}
+        actions={<DownloadLink className="btn btn-secondary btn-sm" href={`${base}/oplog/export.csv`} filename={`${engagement.code}-oplog.csv`}>Export CSV</DownloadLink>}
       >
         {q.isLoading ? (
           <Loading />

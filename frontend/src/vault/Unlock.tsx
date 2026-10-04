@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button, Field, useApiMutation } from "../components/ui";
 import { useDesktopBridge } from "../lib/desktop";
-import type { VaultStatus } from "../types";
+import type { RecoveryKit, VaultStatus } from "../types";
 import { useVault } from "./context";
 import { errorText, PathField, VaultScreen } from "./common";
 
@@ -23,15 +23,28 @@ export function UnlockForm({
   const [path, setPath] = useState(initialPath);
   const [useRecovery, setUseRecovery] = useState(false);
   const [secret, setSecret] = useState("");
+  const [kit, setKit] = useState<RecoveryKit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const loadKit = async (file: File | undefined) => {
+    setError(null);
+    setKit(null);
+    if (!file) return;
+    try {
+      setKit(JSON.parse(await file.text()));
+    } catch {
+      setError(`${file.name} is not a recovery kit file`);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await unlock(path.trim(), useRecovery ? { recovery_key: secret } : { password: secret });
+      const recovery = kit ? { recovery_key: secret, recovery_kit: kit } : { recovery_key: secret };
+      await unlock(path.trim(), useRecovery ? recovery : { password: secret });
     } catch (err) {
       // Wrong password, typo in the recovery key, vault open in another window...
       setError(errorText(err));
@@ -79,6 +92,14 @@ export function UnlockForm({
           />
         </Field>
       )}
+      {useRecovery && (
+        <Field
+          label="Recovery kit (optional)"
+          hint="Only needed if the vault's header files (vault.json) are lost or damaged."
+        >
+          <input type="file" accept=".json,application/json" onChange={(e) => loadKit(e.target.files?.[0])} />
+        </Field>
+      )}
       <Button variant="primary" type="submit" loading={busy} disabled={!secret || !path.trim()} className="btn-block">
         {busy ? "Unlocking" : "Unlock"}
       </Button>
@@ -89,6 +110,7 @@ export function UnlockForm({
           onClick={() => {
             setUseRecovery(!useRecovery);
             setSecret("");
+            setKit(null);
             setError(null);
           }}
         >
@@ -103,7 +125,8 @@ export function UnlockForm({
 /** Explain an unexpected lock: the app unmounted, taking any unsaved form input with it. */
 function lockMessage(status: VaultStatus, interrupted: boolean): string | null {
   const lost = "The page you were on was closed, and anything you had not saved was discarded.";
-  if (status.lock_reason === "idle") return `Locked after ${status.auto_lock_minutes} minutes without activity. ${lost}`;
+  const minutes = status.auto_lock_minutes === 1 ? "1 minute" : `${status.auto_lock_minutes} minutes`;
+  if (status.lock_reason === "idle") return `Locked after ${minutes} without activity. ${lost}`;
   return interrupted ? `The vault was locked. ${lost}` : null;
 }
 

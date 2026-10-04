@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { api, qs } from "../../api";
-import { Button, Card, Field, useApiMutation } from "../../components/ui";
+import { Button, Card, DownloadLink, Field, useApiMutation } from "../../components/ui";
 import type { Engagement, TestCase } from "../../types";
 import { useEngagement, useFindings } from "./context";
 
@@ -80,9 +80,9 @@ export function Report() {
             <input type="checkbox" checked={drafts} onChange={(ev) => setDrafts(ev.target.checked)} /> Include draft findings (internal QA copy)
           </label>
           <div className="actions wrap">
-            <a className="btn btn-primary" href={url("html", true)} download>Save printable HTML</a>
-            <a className="btn btn-secondary" href={url("md", true)} download>Markdown</a>
-            <a className="btn btn-secondary" href={url("json", true)} download>JSON</a>
+            <DownloadLink className="btn btn-primary" href={url("html", true)} filename={`${e.code}-report.html`}>Save printable HTML</DownloadLink>
+            <DownloadLink className="btn btn-secondary" href={url("md", true)} filename={`${e.code}-report.md`}>Markdown</DownloadLink>
+            <DownloadLink className="btn btn-secondary" href={url("json", true)} filename={`${e.code}-report.json`}>JSON</DownloadLink>
           </div>
           <p className="muted small">
             For a PDF, open the saved HTML file in your browser, then Print → Save as PDF. The file is self-contained (images

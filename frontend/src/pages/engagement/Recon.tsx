@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { api } from "../../api";
-import { Button, Card, CopyButton, Empty, Field, Loading, useApiMutation } from "../../components/ui";
+import { Button, Card, CopyButton, DownloadLink, Empty, Field, Loading, useApiMutation } from "../../components/ui";
 import { fmtDateTime } from "../../lib/format";
 import type { ReconImport } from "../../types";
 import { useEngagement } from "./context";
@@ -92,7 +92,7 @@ export function Recon() {
                   <td>{r.tool}</td>
                   <td className="mono small">
                     {r.evidence_id ? (
-                      <a href={`${base}/evidence/${r.evidence_id}/download`} download>{r.filename}</a>
+                      <DownloadLink href={`${base}/evidence/${r.evidence_id}/download`} filename={r.filename}>{r.filename}</DownloadLink>
                     ) : (
                       r.filename
                     )}

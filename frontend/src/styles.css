@@ -57,7 +57,17 @@ textarea { resize: vertical; }
 input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 input[type="file"] { padding: 6px; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-select { cursor: pointer; }
+/* Drawn by us, not the OS theme: WebKitGTK otherwise paints native (light) GTK widgets. */
+select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a97b0'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+select option { background: var(--bg-2); color: var(--text); }
 .input-lg { font-size: 17px; font-weight: 600; padding: 10px 12px; }
 
 /* --------------------------------------------------------------- shell */
@@ -124,6 +134,7 @@ select { cursor: pointer; }
 .card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 12px; }
 .card-body { padding: 16px; }
 .card-body > .table:first-child { margin-top: -6px; }
+.card-body > p:first-child { margin-top: 0; }
 .card-body > * + .btn, .card-body > * + .actions { margin-top: 12px; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -185,7 +196,7 @@ select { cursor: pointer; }
 .table th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .table td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .table tr:last-child td { border-bottom: 0; }
-.table select { width: auto; padding: 4px 8px; font-size: 12px; }
+.table select { width: auto; padding: 4px 24px 4px 8px; background-position: right 8px center; font-size: 12px; }
 .table .clickable { cursor: pointer; }
 .table .clickable:hover td { background: var(--panel-2); }
 .right { text-align: right; }
@@ -314,12 +325,13 @@ button.thumb, .thumb-btn { cursor: zoom-in; }
 .thumb.file-icon { height: 64px; }
 .file-icon { font-family: var(--mono); font-weight: 700; color: var(--muted); font-size: 18px; display: grid; place-items: center; background: #070b13; }
 .evidence-meta { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; word-break: break-word; }
-.evidence-meta select { font-size: 12px; padding: 4px 8px; }
+.evidence-meta select { font-size: 12px; padding: 4px 24px 4px 8px; background-position: right 8px center; }
 .hash { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--muted); }
 .evidence-list { display: flex; flex-direction: column; gap: 10px; }
 .evidence-item { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; }
 .evidence-item img, .evidence-item .file-icon { width: 64px; height: 48px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); font-size: 11px; }
 .import-result { margin-top: 12px; }
+.verify-result { margin: 12px 0 0; }
 .scope-results td { vertical-align: middle; }
 .scope-results .reason { display: block; margin-top: 2px; }
 
@@ -362,6 +374,7 @@ button.thumb, .thumb-btn { cursor: zoom-in; }
 .gate-card p, .gate-card h3 { margin: 0; }
 .gate-card .alert { margin: 0; }
 .gate-title { font-size: 18px; }
+.gate-card .mono { overflow-wrap: anywhere; }
 .gate-form { display: flex; flex-direction: column; gap: 14px; }
 .gate-actions { justify-content: flex-end; }
 .gate-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

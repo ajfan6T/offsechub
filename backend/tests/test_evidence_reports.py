@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import tempfile
@@ -6,8 +7,9 @@ import pytest
 
 from app.config import get_settings
 from app.models import Evidence
+from app.services import storage
 from app.vault.crypto import CryptoError
-from app.vault.manager import BlobIntegrityError
+from app.vault.manager import BlobIntegrityError, VaultLocked
 
 from .conftest import wait_until
 
@@ -128,6 +130,26 @@ def test_download_verifies_size_and_fingerprint(api, engagement, vault):
 
     path.unlink()
     assert api.get(url).status_code == 410
+
+
+def test_locking_stops_transfers_in_flight(api, engagement, vault, app_ctx):
+    manager = app_ctx[1]
+    ev = _upload(api, engagement, "big.bin", b"x" * 200_000).json()
+    row = _row(vault, ev["id"])
+    downloading = storage.stream_evidence(vault, row)
+    assert len(next(downloading)) == 64 * 1024
+
+    async def body():
+        yield b"a" * 100_000
+        manager.lock()
+        yield b"b" * 100_000
+
+    with pytest.raises(VaultLocked):
+        asyncio.run(storage.receive_blob(vault, body()))
+    with pytest.raises(VaultLocked):
+        next(downloading)
+    # The partial upload is gone; only the committed blob remains.
+    assert [p.name for p in (vault.path / "blobs").rglob("*") if p.is_file()] == [row.storage_key]
 
 
 def test_text_evidence(api, engagement):

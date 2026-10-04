@@ -13,8 +13,10 @@ import {
   PageHeader,
   useApiMutation,
 } from "../components/ui";
-import type { Profile, RecoveryKeyResult } from "../types";
-import { EMPTY_PASSWORD, isValidNewPassword, NewPasswordFields } from "../vault/common";
+import { joinPath, useDesktopBridge } from "../lib/desktop";
+import { fmtBytes } from "../lib/format";
+import type { BackupResult, Profile, RecoveryKeyResult, VerifyResult } from "../types";
+import { EMPTY_PASSWORD, isValidNewPassword, NewPasswordFields, PathField } from "../vault/common";
 import {
   PROFILE_KEY,
   RECENT_KEY,
@@ -48,6 +50,7 @@ export function Settings() {
         </div>
         <div className="stack">
           <SessionCard />
+          <BackupCard />
           <PrivacyCard />
           <AboutCard />
         </div>
@@ -62,7 +65,9 @@ function ProfileCard() {
   const q = useProfile();
   return (
     <Card title="Profile">
-      <p className="muted small">Printed on reports and recorded as the operator on op-log entries. Stored inside the vault.</p>
+      <p className="muted small">
+        Printed on reports and recorded as the operator on op-log entries. Stored inside the vault.
+      </p>
       {q.data ? <ProfileForm profile={q.data} /> : q.error ? <ErrorBox error={q.error} /> : <Loading />}
     </Card>
   );
@@ -81,10 +86,10 @@ function ProfileForm({ profile }: { profile: Profile }) {
     <>
       <div className="form-grid single">
         <Field label="Name">
-          <input value={form.name} onChange={set("name")} placeholder="Alex Tester" />
+          <input value={form.name} onChange={set("name")} placeholder="Your name" />
         </Field>
         <Field label="Email">
-          <input type="email" value={form.email} onChange={set("email")} placeholder="alex@example.com" />
+          <input type="email" value={form.email} onChange={set("email")} placeholder="you@example.com" />
         </Field>
         <Field label="Organization">
           <input value={form.organization} onChange={set("organization")} placeholder="Your consultancy or team" />
@@ -115,12 +120,17 @@ function PasswordCard() {
   return (
     <Card title="Password">
       <p className="muted small">
-        Instant: only the wrapped vault key is rewritten, and the recovery key keeps working. Backups taken before the change
-        still open with the old password.
+        Instant: only the wrapped vault key is rewritten, and the recovery key keeps working. Backups taken before the
+        change still open with the old password.
       </p>
       <div className="form-grid single">
         <Field label="Current password">
-          <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
         </Field>
         <NewPasswordFields label="New password" value={next} onChange={setNext} />
       </div>
@@ -163,16 +173,16 @@ function KeysCard() {
   return (
     <Card title="Recovery key and master key">
       <p className="muted small">
-        The recovery key opens the vault if you forget the password. Generate a new one if you lost it or someone else may
-        have seen it.
+        The recovery key opens the vault if you forget the password. Generate a new one if you lost it or someone else
+        may have seen it.
       </p>
       <Button onClick={() => setAction("rotated")}>Generate new recovery key</Button>
       <hr />
       <p className="muted small">
         <strong>Rekeying</strong> replaces the vault's master key after a suspected compromise, for example when your
-        password, recovery key or a copy of the vault folder may have leaked. Old credentials and old copies of the header
-        cannot decrypt anything written afterwards, and you get a new recovery key. Copies of the vault made earlier are not
-        affected; change the password too if it may be known.
+        password, recovery key or a copy of the vault folder may have leaked. Old credentials and old copies of the
+        header cannot decrypt anything written afterwards, and you get a new recovery key. Copies of the vault made
+        earlier are not affected; change the password too if it may be known.
       </p>
       <Button variant="danger" onClick={() => setAction("rekeyed")}>
         Rekey vault…
@@ -221,7 +231,13 @@ function PasswordPrompt({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="password-prompt" variant={danger ? "danger" : "primary"} loading={run.isPending} disabled={!password}>
+          <Button
+            type="submit"
+            form="password-prompt"
+            variant={danger ? "danger" : "primary"}
+            loading={run.isPending}
+            disabled={!password}
+          >
             {confirmLabel}
           </Button>
         </>
@@ -231,7 +247,13 @@ function PasswordPrompt({
         <p className="muted small">{children}</p>
         {run.error && <ErrorBox error={run.error} />}
         <Field label="Vault password">
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+          />
         </Field>
       </form>
     </Modal>
@@ -239,7 +261,8 @@ function PasswordPrompt({
 }
 
 const AUTO_LOCK_CHOICES = [5, 15, 30, 60];
-const autoLockLabel = (m: number) => (m === 0 ? "Never" : m === 60 ? "1 hour" : m % 60 === 0 ? `${m / 60} hours` : `${m} minutes`);
+const autoLockLabel = (m: number) =>
+  m === 0 ? "Never" : m === 1 ? "1 minute" : m === 60 ? "1 hour" : m % 60 === 0 ? `${m / 60} hours` : `${m} minutes`;
 
 function SessionCard() {
   const qc = useQueryClient();
@@ -249,7 +272,8 @@ function SessionCard() {
   const setAutoLock = useApiMutation(
     (auto_lock_minutes: number) => api.put<{ auto_lock_minutes: number }>("/api/vault/settings", { auto_lock_minutes }),
     {
-      success: (s) => (s.auto_lock_minutes ? `Auto-lock after ${autoLockLabel(s.auto_lock_minutes)} idle` : "Auto-lock turned off"),
+      success: (s) =>
+        s.auto_lock_minutes ? `Auto-lock after ${autoLockLabel(s.auto_lock_minutes)} idle` : "Auto-lock turned off",
       onSuccess: () => qc.invalidateQueries({ queryKey: STATUS_KEY }),
     },
   );
@@ -260,9 +284,17 @@ function SessionCard() {
       <div className="form-grid single">
         <Field
           label="Auto-lock when idle"
-          hint={current ? "Counts keyboard and mouse input in OffsecHub, not background refreshes." : "The vault stays unlocked until you lock it or quit OffsecHub."}
+          hint={
+            current
+              ? "Counts keyboard and mouse input in OffsecHub, not background refreshes."
+              : "The vault stays unlocked until you lock it or quit OffsecHub."
+          }
         >
-          <select value={current} disabled={setAutoLock.isPending} onChange={(e) => setAutoLock.mutate(Number(e.target.value))}>
+          <select
+            value={current}
+            disabled={setAutoLock.isPending}
+            onChange={(e) => setAutoLock.mutate(Number(e.target.value))}
+          >
             {[...choices, 0].map((m) => (
               <option key={m} value={m}>
                 {autoLockLabel(m)}
@@ -272,8 +304,8 @@ function SessionCard() {
         </Field>
       </div>
       <p className="muted small">
-        Locking saves pending changes, discards the keys from memory and closes the database. Closing also returns to the
-        vault picker.
+        Locking saves pending changes, discards the keys from memory and closes the database. Closing also returns to
+        the vault picker.
       </p>
       <div className="actions">
         <Button variant="primary" loading={lockNow.isPending} onClick={() => lockNow.mutate(undefined)}>
@@ -287,18 +319,100 @@ function SessionCard() {
   );
 }
 
+// ---------------------------------------------------------- backup/integrity
+
+function BackupCard() {
+  const { status } = useVault();
+  const info = useAppInfo();
+  const bridge = useDesktopBridge();
+  const [folder, setFolder] = useState<string | null>(null);
+  const dir = folder ?? info.data?.default_vault_dir ?? "";
+  const target = dir ? joinPath(dir, `${status.name}-backup-${new Date().toISOString().slice(0, 10)}.ohvault`) : "";
+  const backup = useApiMutation(() => api.post<BackupResult>("/api/vault/backup", { path: target }), {
+    success: (r) => `Backup written to ${r.path}`,
+  });
+  const verify = useApiMutation(() => api.post<VerifyResult>("/api/vault/verify"));
+  return (
+    <Card title="Backup and integrity">
+      <p className="muted small">
+        A backup is a complete copy of this vault, still encrypted and checked after writing. It opens with the current
+        password and recovery key. Put it on another disk: a copy next to the vault will not survive a disk failure.
+      </p>
+      <div className="form-grid single">
+        <PathField
+          label="Backup location"
+          value={dir}
+          onChange={setFolder}
+          pick={bridge ? () => bridge.pick_folder() : undefined}
+        />
+      </div>
+      {target && (
+        <p className="small muted">
+          Writes <span className="mono">{target}</span>
+        </p>
+      )}
+      <Button loading={backup.isPending} disabled={!target} onClick={() => backup.mutate(undefined)}>
+        Export backup
+      </Button>
+      {backup.data && (
+        <p className="small">
+          {backup.data.evidence_files} evidence file(s), {fmtBytes(backup.data.bytes)} in total.
+        </p>
+      )}
+      <hr />
+      <p className="muted small">
+        Decrypt every evidence file and check it against the SHA-256 recorded when it was added.
+      </p>
+      <Button loading={verify.isPending} onClick={() => verify.mutate(undefined)}>
+        Verify evidence
+      </Button>
+      {verify.data && <VerifySummary result={verify.data} />}
+    </Card>
+  );
+}
+
+function VerifySummary({ result: r }: { result: VerifyResult }) {
+  const damaged = [...r.missing.map((f) => `${f} (missing)`), ...r.corrupt.map((f) => `${f} (fails authentication)`)];
+  return (
+    <div className={`alert ${damaged.length ? "alert-error" : "alert-success"} small verify-result`}>
+      {damaged.length ? (
+        <>
+          <strong>
+            {damaged.length} of {r.evidence} evidence file(s) failed verification.
+          </strong>
+          <ul className="tight">
+            {damaged.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+          Restore them from a backup.
+        </>
+      ) : (
+        `All ${r.evidence} evidence file(s) verified.`
+      )}
+      {r.orphaned_files > 0 && (
+        <div className="muted">
+          {r.orphaned_files} unreferenced file(s) in the vault folder were left alone; they may belong to a backup or a
+          sync copy.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ privacy
 
 function PrivacyCard() {
-  const qc = useQueryClient();
   const recent = useRecentVaults();
-  const refresh = () => qc.invalidateQueries({ queryKey: RECENT_KEY });
-  const setRemember = useApiMutation((remember_recent: boolean) => api.put("/api/app/preferences", { remember_recent }), {
-    onSuccess: refresh,
+  // Shown immediately; the server value takes over again if saving fails.
+  const [remember, setRemember] = useState<boolean>();
+  const saveRemember = useApiMutation((value: boolean) => api.put("/api/app/preferences", { remember_recent: value }), {
+    invalidate: [RECENT_KEY],
+    onError: () => setRemember(undefined),
   });
   const forgetAll = useApiMutation(() => api.post("/api/app/recent/forget", {}), {
+    invalidate: [RECENT_KEY],
     success: "Recent vaults forgotten",
-    onSuccess: refresh,
   });
   const count = recent.data?.vaults.length ?? 0;
   return (
@@ -306,15 +420,18 @@ function PrivacyCard() {
       <label className="check">
         <input
           type="checkbox"
-          checked={recent.data?.remember_recent ?? false}
-          disabled={!recent.data || setRemember.isPending}
-          onChange={(e) => setRemember.mutate(e.target.checked)}
+          checked={remember ?? recent.data?.remember_recent ?? false}
+          disabled={!recent.data}
+          onChange={(e) => {
+            setRemember(e.target.checked);
+            saveRemember.mutate(e.target.checked);
+          }}
         />
         Remember recently opened vaults
       </label>
       <p className="muted small">
-        The welcome screen lists them from OffsecHub's app config, which is not encrypted. Only folder paths are kept, but a
-        path such as <span className="mono">ACME-2026.ohvault</span> can reveal who you work for.
+        The welcome screen lists them from OffsecHub's app config, which is not encrypted. Only folder paths are kept,
+        but a path such as <span className="mono">ACME-2026.ohvault</span> can reveal who you work for.
       </p>
       <ConfirmButton
         size="sm"
@@ -343,15 +460,16 @@ function AboutCard() {
         <dd>{info.data ? `${info.data.platform}, ${info.data.desktop ? "desktop app" : "browser mode"}` : "-"}</dd>
         <dt>Vault</dt>
         <dd>
-          <span className="mono small">{status.path}</span> {status.path && <CopyButton text={status.path} label="Copy path" />}
+          <span className="mono small">{status.path}</span>{" "}
+          {status.path && <CopyButton text={status.path} label="Copy path" />}
         </dd>
       </dl>
       <h3>Your data at rest</h3>
       <p className="small">
-        Everything in this vault lives in one folder on this machine, encrypted with AES-256-GCM under a master key that only
-        your password (via Argon2id) or your recovery key can unwrap. Each save and each evidence file gets its own key, and
-        the vault header holds no client data. Decrypted data exists only in OffsecHub's memory while the vault is unlocked.
-        Nothing is sent over the network: there is no server, no account and no telemetry.
+        Everything in this vault lives in one folder on this machine, encrypted with AES-256-GCM under a master key that
+        only your password (via Argon2id) or your recovery key can unwrap. Each save and each evidence file gets its own
+        key, and the vault header holds no client data. Decrypted data exists only in OffsecHub's memory while the vault
+        is unlocked. Nothing is sent over the network: there is no server, no account and no telemetry.
       </p>
       <p className="small muted">
         Not hidden: the folder name, the number and sizes of evidence files, and file timestamps.

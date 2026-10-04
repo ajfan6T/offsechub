@@ -97,8 +97,8 @@ def unlock_vault(body: UnlockIn, manager: VaultManager = Depends(get_manager)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
     vault = manager.require()
     how = "recovery key" if body.recovery_key else "password"
-    note = f" (recovered from {vault.recovered_from})" if vault.recovered_from else ""
-    _log(vault, f"Unlocked with {how}{note}", action="unlock")
+    notes = [*vault.warnings, *vault.notices]
+    _log(vault, f"Unlocked with {how}" + (f" ({'; '.join(notes)})" if notes else ""), action="unlock")
     return manager.status()
 
 

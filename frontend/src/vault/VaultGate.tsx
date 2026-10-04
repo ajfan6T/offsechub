@@ -3,7 +3,15 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { api, setApiEvents } from "../api";
 import { Button, ErrorBox, Loading } from "../components/ui";
 import type { VaultStatus } from "../types";
-import { isAppQuery, RECENT_KEY, STATUS_KEY, VaultContext, type RecoveryKeyReason, type UnlockSecret, type VaultApi } from "./context";
+import {
+  isAppQuery,
+  RECENT_KEY,
+  STATUS_KEY,
+  VaultContext,
+  type RecoveryKeyReason,
+  type UnlockSecret,
+  type VaultApi,
+} from "./context";
 import { VaultScreen } from "./common";
 import { RecoveryKeyScreen } from "./RecoveryKey";
 import { SetPassword } from "./SetPassword";
@@ -56,17 +64,17 @@ export function VaultGate({ children }: { children: ReactNode }) {
     return () => setApiEvents({});
   }, [qc]);
 
-  // Once the vault is not unlocked, drop every cached query and mutation: they
-  // hold decrypted vault data, which should not outlive the key in this page.
-  // Safe as an effect: by now the app has unmounted, and the screens rendered
-  // instead only use "app" queries.
+  // Once the app is gone (vault not unlocked, or session lost), drop every cached
+  // query and mutation: they hold decrypted vault data, which should not outlive
+  // the key in this page. Safe as an effect: by now the app has unmounted, and the
+  // screens rendered instead only use "app" queries.
   useEffect(() => {
-    if (state && state !== "unlocked") {
+    if ((state && state !== "unlocked") || sessionLost) {
       qc.removeQueries({ predicate: (q) => !isAppQuery(q) });
       qc.getMutationCache().clear();
       setTypedRecoveryKey(null);
     }
-  }, [state, qc]);
+  }, [state, sessionLost, qc]);
 
   useActivityHeartbeat(state === "unlocked" && !sessionLost);
 
@@ -81,7 +89,13 @@ export function VaultGate({ children }: { children: ReactNode }) {
             setStatus,
             showRecoveryKey: (key, reason) => setPendingKey({ key, reason }),
             unlock: async (path: string, secret: UnlockSecret) => {
-              const next = await api.post<VaultStatus>("/api/vault/unlock", { path, ...secret });
+              let next: VaultStatus;
+              try {
+                next = await api.post<VaultStatus>("/api/vault/unlock", { path, ...secret });
+              } catch (err) {
+                refreshStatus(); // a server error may still have left the vault unlocked
+                throw err;
+              }
               setTypedRecoveryKey("recovery_key" in secret ? secret.recovery_key : null);
               setInterrupted(false);
               setStatus(next);
@@ -94,7 +108,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
             },
           }
         : null,
-    [status, setStatus, qc],
+    [status, setStatus, refreshStatus, qc],
   );
 
   if (sessionLost) return <SessionLost />;
@@ -143,7 +157,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
     <VaultContext.Provider value={vault}>
       {screen}
       {s.state === "unlocked" && (
-<AutoLockWarning deadline={deadline} onStay={stayUnlocked} onExpired={refreshStatus} />
+        <AutoLockWarning deadline={deadline} onStay={stayUnlocked} onExpired={refreshStatus} />
       )}
     </VaultContext.Provider>
   );
@@ -221,8 +235,8 @@ function SessionLost() {
         cleared. For security, a session can only be created when OffsecHub launches.
       </p>
       <p className="muted small">
-        Close this window and start OffsecHub again. In browser mode, run <code>offsechub open</code> for a fresh one-time
-        link. Your vault is safe: everything saved is already encrypted on disk.
+        Close this window and start OffsecHub again. In browser mode, run <code>offsechub open</code> for a fresh
+        one-time link. Your vault is safe: everything saved is already encrypted on disk.
       </p>
     </VaultScreen>
   );

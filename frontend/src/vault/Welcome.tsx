@@ -33,7 +33,10 @@ export function Welcome() {
     );
 
   return (
-    <VaultScreen wide subtitle="Your engagements, encrypted on this machine. No account, no server, nothing leaves your disk.">
+    <VaultScreen
+      wide
+      subtitle="Your engagements, encrypted on this machine. No account, no server, nothing leaves your disk."
+    >
       <RecentList onOpen={(vault) => setView({ kind: "open", vault })} />
       <div className="actions gate-actions">
         <Button onClick={() => setView({ kind: "open" })}>Open vault…</Button>
@@ -42,8 +45,8 @@ export function Welcome() {
         </Button>
       </div>
       <p className="muted small">
-        A vault is one encrypted folder holding scope, targets, findings, evidence and op logs for a body of work. Back it up
-        like any other folder; the copies stay encrypted.
+        A vault is one encrypted folder holding the scope, targets, findings, evidence and op logs for a body of work.
+        Back it up from Settings, or copy the folder while the vault is closed; copies stay encrypted.
       </p>
     </VaultScreen>
   );
@@ -65,12 +68,19 @@ function RecentList({ onOpen }: { onOpen: (vault: RecentVault) => void }) {
           <li key={v.path}>
             <div className="recent-name">
               <strong>{v.name}</strong> {!v.exists && <Badge tone="amber">Not found</Badge>}
-              <div className="mono small muted">{v.path}</div>
+              <div className="mono small muted" title={v.path}>
+                {v.path}
+              </div>
             </div>
             <Button size="sm" variant="primary" disabled={!v.exists} onClick={() => onOpen(v)}>
               Open
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => forget.mutate(v.path)} title="Remove from this list (the vault itself is not touched)">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => forget.mutate(v.path)}
+              title="Remove from this list (the vault itself is not touched)"
+            >
               Forget
             </Button>
           </li>

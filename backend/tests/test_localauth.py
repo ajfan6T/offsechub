@@ -6,7 +6,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.testclient import TestClient
 
-from app.localauth import COOKIE_NAME, LocalAuth, LocalAuthMiddleware
+from app.localauth import LocalAuth, LocalAuthMiddleware
 
 HOST = "127.0.0.1:43210"
 
@@ -75,8 +75,8 @@ def test_wrong_or_missing_token(client, auth):
     assert client.get("/_launch", follow_redirects=False).status_code == 403
 
 
-def test_forged_cookie_is_refused(client):
-    client.cookies.set(COOKIE_NAME, "guess")
+def test_forged_cookie_is_refused(client, auth):
+    client.cookies.set(auth.cookie_name, "guess")
     assert client.get("/api/x").status_code == 401
 
 
@@ -156,3 +156,13 @@ def test_only_ui_changes_and_the_heartbeat_count_as_activity(auth):
     cli = TestClient(app, base_url=f"http://{HOST}", headers={"Authorization": f"Bearer {auth.api_token}"})
     cli.post("/api/x")
     assert len(hits) == 2  # automation (e.g. a cron job pushing scans) does not either
+
+
+def test_cookie_name_is_per_port(client, auth):
+    """Browsers share cookies across ports: two instances must not clobber each other."""
+    launch(client, auth)
+    assert auth.cookie_name == "ohub_session_43210"
+    assert client.cookies.get(auth.cookie_name)
+    other = LocalAuth()
+    other.bind(43211)
+    assert other.cookie_name != auth.cookie_name

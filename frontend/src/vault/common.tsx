@@ -2,7 +2,17 @@ import { useState, type ReactNode } from "react";
 import { Button, Field, Logo } from "../components/ui";
 
 /** Full-screen centred card used by every screen shown outside an unlocked vault. */
-export function VaultScreen({ title, subtitle, wide, children }: { title?: ReactNode; subtitle?: ReactNode; wide?: boolean; children: ReactNode }) {
+export function VaultScreen({
+  title,
+  subtitle,
+  wide,
+  children,
+}: {
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="gate">
       <div className={`gate-card ${wide ? "gate-card-wide" : ""}`}>
@@ -95,7 +105,10 @@ const LABELS = ["Too short", "Weak", "Fair", "Good", "Strong"];
 export function passwordStrength(pw: string): number {
   if (pw.length < MIN_PASSWORD) return 0;
   const pool =
-    (/[a-z]/.test(pw) ? 26 : 0) + (/[A-Z]/.test(pw) ? 26 : 0) + (/\d/.test(pw) ? 10 : 0) + (/[^A-Za-z0-9]/.test(pw) ? 33 : 0);
+    (/[a-z]/.test(pw) ? 26 : 0) +
+    (/[A-Z]/.test(pw) ? 26 : 0) +
+    (/\d/.test(pw) ? 10 : 0) +
+    (/[^A-Za-z0-9]/.test(pw) ? 33 : 0);
   const effective = Math.min(pw.length, new Set(pw).size * 2);
   const bits = effective * Math.log2(pool);
   if (COMMON.test(pw) || bits < 50) return 1;
@@ -144,8 +157,16 @@ export function NewPasswordFields({
           autoFocus={autoFocus}
         />
       </Field>
-      <Field label={`Confirm ${label.toLowerCase()}`} hint={mismatch ? <span className="error-text">Passwords do not match</span> : undefined}>
-        <input type="password" autoComplete="new-password" value={value.confirm} onChange={(e) => onChange({ ...value, confirm: e.target.value })} />
+      <Field
+        label={`Confirm ${label.toLowerCase()}`}
+        hint={mismatch ? <span className="error-text">Passwords do not match</span> : undefined}
+      >
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={value.confirm}
+          onChange={(e) => onChange({ ...value, confirm: e.target.value })}
+        />
       </Field>
     </>
   );

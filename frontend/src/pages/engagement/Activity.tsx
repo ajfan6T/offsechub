@@ -17,7 +17,10 @@ const ACTION_TONE: Record<string, string> = {
 
 export function Activity() {
   const { base } = useEngagement();
-  const q = useQuery({ queryKey: [base, "activity"], queryFn: () => api.get<ActivityEvent[]>(`${base}/activity?limit=500`) });
+  const q = useQuery({
+    queryKey: [base, "activity"],
+    queryFn: () => api.get<ActivityEvent[]>(`${base}/activity?limit=500`),
+  });
   return (
     <Card title="Activity">
       <p className="muted small">Append-only record of every change, import, export and deletion in this engagement.</p>
@@ -27,7 +30,13 @@ export function Activity() {
 }
 
 /** With `engagementCodes`, adds an engagement column (the vault-wide view). */
-export function ActivityTable({ events, engagementCodes }: { events: ActivityEvent[]; engagementCodes?: Map<number, string> }) {
+export function ActivityTable({
+  events,
+  engagementCodes,
+}: {
+  events: ActivityEvent[];
+  engagementCodes?: Map<number, string>;
+}) {
   if (!events.length) return <Empty title="No activity yet" />;
   return (
     <table className="table">

@@ -67,6 +67,13 @@ class ParseResult:
 _OPEN_STATES = {"open", "open|filtered"}
 
 
+def _int(value: str | None) -> int | None:
+    try:
+        return int(value or "")
+    except ValueError:
+        return None
+
+
 def parse_nmap_xml(data: bytes) -> ParseResult:
     try:
         root = SafeET.fromstring(data)
@@ -93,7 +100,7 @@ def parse_nmap_xml(data: bytes) -> ParseResult:
         os_name = ""
         matches = host_el.findall("os/osmatch")
         if matches:
-            best = max(matches, key=lambda o: int(o.get("accuracy", "0") or 0))
+            best = max(matches, key=lambda o: _int(o.get("accuracy")) or 0)
             os_name = best.get("name", "")
 
         services = []
@@ -104,9 +111,8 @@ def parse_nmap_xml(data: bytes) -> ParseResult:
                 continue
             svc = port_el.find("service")
             get = (lambda k: svc.get(k, "")) if svc is not None else (lambda k: "")
-            try:
-                port = int(port_el.get("portid", ""))
-            except ValueError:
+            port = _int(port_el.get("portid"))
+            if port is None or not 0 <= port <= 65535:
                 result.errors.append(f"bad port id on host {ip or hostname}")
                 continue
             services.append(
@@ -144,11 +150,19 @@ def _as_list(v) -> list:
     return v if isinstance(v, list) else [v]
 
 
+def _as_dict(v) -> dict:
+    # Records are untrusted: a field that should be an object may be anything.
+    return v if isinstance(v, dict) else {}
+
+
 def _nuclei_host(record: dict) -> ParsedHost:
     host = str(record.get("host") or record.get("matched-at") or "")
     ip = str(record.get("ip") or "")
     if "://" in host:
-        parts = urlsplit(host)
+        try:
+            parts = urlsplit(host)
+        except ValueError:  # e.g. an unterminated IPv6 literal
+            return ParsedHost(value=host, ip=ip)
         origin = f"{parts.scheme}://{parts.netloc}"
         return ParsedHost(value=origin, kind="web", hostname=parts.hostname or "", ip=ip)
     ident = parse_identifier(host)
@@ -181,11 +195,12 @@ def parse_nuclei(data: bytes) -> ParseResult:
         raise ParseError("no nuclei results found")
 
     for rec in records:
-        if not isinstance(rec, dict) or "template-id" not in rec:
+        template_id = rec.get("template-id") if isinstance(rec, dict) else None
+        if not isinstance(template_id, str) or not template_id:
             result.errors.append("skipped record without template-id")
             continue
-        info = rec.get("info") or {}
-        classification = info.get("classification") or {}
+        info = _as_dict(rec.get("info"))
+        classification = _as_dict(info.get("classification"))
         severity = str(info.get("severity", "info")).lower()
         host = _nuclei_host(rec)
         matched_at = str(rec.get("matched-at") or rec.get("host") or "")
@@ -208,8 +223,8 @@ def parse_nuclei(data: bytes) -> ParseResult:
         result.hosts.append(host)
         result.issues.append(
             ParsedIssue(
-                key=f"nuclei:{rec['template-id']}",
-                title=str(info.get("name") or rec["template-id"]),
+                key=f"nuclei:{template_id}",
+                title=str(info.get("name") or template_id),
                 severity=severity if severity in _NUCLEI_SEVERITY else "info",
                 host=host,
                 matched_at=matched_at,

@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   ConfirmButton,
+  DownloadLink,
   Field,
   Lightbox,
   Loading,
@@ -231,7 +232,7 @@ function EvidencePanel({ finding }: { finding: Finding }) {
               <div className="file-icon">{e.filename.split(".").pop()?.toUpperCase().slice(0, 4)}</div>
             )}
             <div className="evidence-meta">
-              <a href={evidenceUrl(base, e)} download className="strong small">{e.filename}</a>
+              <DownloadLink href={evidenceUrl(base, e)} filename={e.filename} className="strong small">{e.filename}</DownloadLink>
               <div className="muted small">{fmtBytes(e.size)} · <span className="mono" title={e.sha256}>{e.sha256.slice(0, 12)}</span></div>
               {e.description && <div className="small">{e.description}</div>}
             </div>

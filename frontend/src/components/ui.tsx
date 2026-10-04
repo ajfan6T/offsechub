@@ -6,9 +6,11 @@ import {
   useEffect,
   useState,
   type ButtonHTMLAttributes,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import { ApiError } from "../api";
+import { useDesktopBridge } from "../lib/desktop";
 import { FINDING_STATUSES, TEST_STATUSES, titleCase } from "../lib/format";
 import type { FindingStatus, ScopeStatus, Severity, TestStatus } from "../types";
 
@@ -370,9 +372,9 @@ export function Lightbox({ images, start, onClose }: { images: LightboxImage[]; 
             </>
           )}
           {img.href && (
-            <a className="btn btn-secondary btn-sm" href={img.href} download>
+            <DownloadLink className="btn btn-secondary btn-sm" href={img.href} filename={img.title}>
               Download
-            </a>
+            </DownloadLink>
           )}
           <Button size="sm" onClick={onClose}>
             Close
@@ -380,6 +382,47 @@ export function Lightbox({ images, start, onClose }: { images: LightboxImage[]; 
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A file download that works in both shells. In a browser it is a plain
+ * same-origin download link. The desktop window has its engine's downloads
+ * switched off, so there it opens a native "save as" dialog and the shell
+ * fetches the file from the local API.
+ */
+export function DownloadLink({
+  href,
+  filename,
+  className,
+  children,
+}: {
+  href: string;
+  filename: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const bridge = useDesktopBridge();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const onClick = async (e: MouseEvent<HTMLAnchorElement>) => {
+    if (!bridge) return; // the browser handles it
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      const saved = await bridge.save_download(href, filename);
+      if (saved) toast("success", `Saved to ${saved}`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <a href={href} download={filename} className={className} onClick={onClick} aria-busy={busy || undefined}>
+      {children}
+    </a>
   );
 }
 
@@ -423,6 +466,7 @@ export function useApiMutation<TVars, TData = unknown>(
     invalidate?: QueryKey[];
     success?: string | ((data: TData) => string);
     onSuccess?: (data: TData, vars: TVars) => void;
+    onError?: (err: unknown) => void;
   } = {},
 ) {
   const qc = useQueryClient();
@@ -435,6 +479,7 @@ export function useApiMutation<TVars, TData = unknown>(
       opts.onSuccess?.(data, vars);
     },
     onError: (err) => {
+      opts.onError?.(err);
       // 423 and 401 get a full-screen explanation from the VaultGate instead.
       if (err instanceof ApiError && (err.status === 423 || err.status === 401)) return;
       toast("error", err instanceof Error ? err.message : String(err));

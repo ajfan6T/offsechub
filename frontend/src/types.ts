@@ -19,6 +19,9 @@ export interface VaultStatus {
   /** Integrity problems found on unlock (fell back to a backup, quarantined a file...). */
   warnings: string[];
   notices: string[];
+  /** Changes not yet sealed to disk (saves are coalesced, so briefly true after edits). */
+  dirty: boolean;
+  last_saved_at: string | null;
   /** Last failed background save; cleared by the next successful one. */
   save_error: string | null;
 }
@@ -49,8 +52,30 @@ export interface Profile {
   organization: string;
 }
 
+/**
+ * The recovery keyslot on its own (no secret). With the recovery key it reopens
+ * a vault whose header files are all lost.
+ */
+export type RecoveryKit = Record<string, unknown>;
+
 export interface RecoveryKeyResult {
   recovery_key: string;
+  recovery_kit: RecoveryKit;
+}
+
+export interface BackupResult {
+  path: string;
+  generation: number;
+  evidence_files: number;
+  bytes: number;
+}
+
+export interface VerifyResult {
+  evidence: number;
+  verified: number;
+  missing: string[];
+  corrupt: string[];
+  orphaned_files: number;
 }
 
 // ---------------------------------------------------------------- domain

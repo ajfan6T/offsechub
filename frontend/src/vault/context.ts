@@ -1,7 +1,7 @@
 import { useQuery, type Query } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { api } from "../api";
-import type { AppInfo, Profile, RecentVaults, VaultStatus } from "../types";
+import type { AppInfo, Profile, RecentVaults, RecoveryKit, VaultStatus } from "../types";
 
 // Query keys under "app" do not depend on an unlocked vault and survive a lock.
 // Every other query holds decrypted vault data and is dropped when the vault locks.
@@ -15,7 +15,7 @@ export const isAppQuery = (q: Query) => q.queryKey[0] === "app";
 /** Why a recovery key is on screen; picks the wording of the show-once screen. */
 export type RecoveryKeyReason = "created" | "reset" | "rotated" | "rekeyed";
 
-export type UnlockSecret = { password: string } | { recovery_key: string };
+export type UnlockSecret = { password: string } | { recovery_key: string; recovery_kit?: RecoveryKit };
 
 /** Vault lifecycle, provided by the VaultGate to every screen and page. */
 export interface VaultApi {

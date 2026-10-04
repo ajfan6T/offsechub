@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, CopyButton } from "../components/ui";
+import { Button, CopyButton, DownloadLink } from "../components/ui";
 import type { RecoveryKeyReason } from "./context";
 import { VaultScreen } from "./common";
 
@@ -73,13 +73,23 @@ export function RecoveryKeyScreen({
           <li>It is shown only now. OffsecHub keeps no copy and cannot recover it for you.</li>
         </ul>
       </div>
+      <p className="small no-print">
+        <DownloadLink href="/api/vault/recovery-kit" filename={`${vaultName ?? "vault"}-recovery-kit.json`}>
+          Save the recovery kit
+        </DownloadLink>{" "}
+        as well: a small file with no secret in it. Together with this key it reopens the vault even if its header files
+        are lost or damaged.
+      </p>
       <div className="actions no-print">
         <CopyButton text={recoveryKey} label="Copy key" variant="secondary" />
-        <Button onClick={() => window.print()}>Print</Button>
+        <Button size="sm" onClick={() => window.print()}>
+          Print
+        </Button>
         <span className="muted small">If you copy it, clear your clipboard afterwards.</span>
       </div>
       <label className="check no-print">
-        <input type="checkbox" checked={stored} onChange={(e) => setStored(e.target.checked)} />I have stored it somewhere safe
+        <input type="checkbox" checked={stored} onChange={(e) => setStored(e.target.checked)} />I have stored it
+        somewhere safe
       </label>
       <Button variant="primary" className="btn-block no-print" disabled={!stored} onClick={onDone}>
         Continue

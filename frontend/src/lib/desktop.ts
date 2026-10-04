@@ -10,6 +10,13 @@ export interface DesktopBridge {
   pick_folder(): Promise<string | null>;
   /** "Open vault" dialog. Resolves to an existing *.ohvault directory, or null. */
   pick_vault(): Promise<string | null>;
+  /**
+   * "Save as" dialog for a same-origin /api/ download; the shell fetches and
+   * writes the file. Resolves to the saved path, or null if cancelled. The
+   * webview's own downloads are disabled (WebKit re-fetches them without the
+   * session cookie).
+   */
+  save_download(apiPath: string, suggestedName: string): Promise<string | null>;
 }
 
 declare global {
@@ -20,7 +27,9 @@ declare global {
 
 function currentBridge(): DesktopBridge | null {
   const bridge = window.pywebview?.api;
-  return typeof bridge?.pick_folder === "function" && typeof bridge.pick_vault === "function"
+  return typeof bridge?.pick_folder === "function" &&
+    typeof bridge.pick_vault === "function" &&
+    typeof bridge.save_download === "function"
     ? (bridge as DesktopBridge)
     : null;
 }
@@ -51,7 +60,5 @@ export function joinPath(dir: string, name: string): string {
 
 /** Make a vault name safe to use as a file name on Windows, macOS and Linux. */
 export function safeFileName(name: string): string {
-  return name
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
-    .replace(/^[\s.]+|[\s.]+$/g, "");
+  return name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/^[\s.]+|[\s.]+$/g, "");
 }

@@ -27,9 +27,16 @@ export function Layout() {
         <div className="vault-chip" title={status.path ?? undefined}>
           <span>
             <strong>{status.name}</strong>
-            <small>{status.auto_lock_minutes ? `Auto-locks after ${status.auto_lock_minutes} min idle` : "Auto-lock off"}</small>
+            <small>
+              {status.auto_lock_minutes ? `Auto-lock: ${status.auto_lock_minutes} min idle` : "Auto-lock off"}
+            </small>
           </span>
-          <Button size="sm" loading={lockNow.isPending} onClick={() => lockNow.mutate(undefined)} title="Lock the vault (Settings has more options)">
+          <Button
+            size="sm"
+            loading={lockNow.isPending}
+            onClick={() => lockNow.mutate(undefined)}
+            title="Lock the vault (Settings has more options)"
+          >
             Lock
           </Button>
         </div>
@@ -78,8 +85,8 @@ function VaultBanners({ status }: { status: VaultStatus }) {
         <div className="alert alert-error" role="alert">
           <strong>Changes are not being saved.</strong> {status.save_error}
           <div className="small">
-            OffsecHub keeps retrying. Until a save succeeds, recent changes exist only in memory: free up disk space or fix
-            the vault folder's permissions, and keep OffsecHub open.
+            OffsecHub keeps retrying. Until a save succeeds, recent changes exist only in memory: free up disk space or
+            fix the vault folder's permissions, and keep OffsecHub open.
           </div>
         </div>
       )}

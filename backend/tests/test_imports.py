@@ -157,3 +157,19 @@ def test_import_filename_defaults_to_tool(api, engagement):
     r = api.post(f"/api/engagements/{engagement['id']}/imports/upload", params={"tool": "list"},
                  content=b"203.0.113.4\n")
     assert r.status_code == 201 and r.json()["filename"] == "list-output"
+
+
+def test_parsers_tolerate_malformed_fields():
+    """Tool output is attacker-influenced: odd field types become errors, never crashes."""
+    r = parse_nuclei(b'{"template-id": null, "info": [null]}\n'
+                     b'{"template-id": "x", "info": ["n"], "host": "http://[::1"}\n'
+                     b'{"template-id": "y", "info": {"classification": 5}, "host": "10.0.0.2"}')
+    assert r.errors == ["skipped record without template-id"]
+    assert [i.key for i in r.issues] == ["nuclei:x", "nuclei:y"]
+
+    r = parse_nmap_xml(b'<nmaprun><host><status state="up"/><address addr="10.0.0.1" addrtype="ipv4"/>'
+                       b'<os><osmatch name="Linux" accuracy="9x"/></os><ports>'
+                       b'<port portid="99999"><state state="open"/></port>'
+                       b'<port portid="22"><state state="open"/></port></ports></host></nmaprun>')
+    assert r.hosts[0].os == "Linux" and [s.port for s in r.hosts[0].services] == [22]
+    assert r.errors == ["bad port id on host 10.0.0.1"]
