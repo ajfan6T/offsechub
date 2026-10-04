@@ -87,7 +87,27 @@ All taken from the real app running the sample engagement (`offsechub demo`).
 
 What it does **not** protect against (for example, malware running as you while the vault is unlocked) is spelled out in the [threat model](docs/THREAT_MODEL.md#6-out-of-scope-stated-plainly).
 
-## Install and run
+## Install
+
+Installers for each release are on the [Releases page](https://github.com/ajfan6T/offsechub/releases), with a `SHA256SUMS` file. Every CI run also attaches them as build artifacts.
+
+| System | Installer | How |
+|---|---|---|
+| Windows 10 or 11, x64 | `offsechub-setup-<version>.exe` | Run it. It installs for your user without administrator rights (or for all users, if you choose), adds a Start menu entry and an uninstaller, and installs the Microsoft WebView2 Runtime if it is missing. Optionally adds a desktop icon and puts `offsechub-cli` on your PATH. |
+| macOS 11 or later, Apple silicon | `OffsecHub-<version>-macOS-arm64.dmg` | Open it and drag OffsecHub to Applications. |
+| Debian, Ubuntu, Kali and derivatives, x64 | `offsechub_<version>_amd64.deb` | `sudo apt install ./offsechub_<version>_amd64.deb` (pulls in WebKitGTK and PyGObject from your distribution). |
+
+The builds aren't signed with a paid certificate yet, so the first launch needs one confirmation:
+- **Windows SmartScreen:** click *More info*, then *Run anyway*.
+- **macOS:** open *System Settings > Privacy & Security*, then click *Open Anyway*.
+
+Check the download against `SHA256SUMS` first.
+
+Uninstalling removes the app only. Your vaults and settings stay where they are.
+
+To build the installers yourself, run `packaging/build.sh` on Linux or macOS, or `packaging\build.ps1` on Windows.
+
+## Run from source
 
 Requirements: Python 3.11+, Node 20+ (to build the UI). On Linux, the native window needs WebKitGTK; without it, use `--browser`.
 
@@ -119,7 +139,6 @@ offsechub import ACME-EXT-26 scan.xml --tool nmap
 nuclei -l hosts.txt -jsonl -o nuclei.jsonl && offsechub import ACME-EXT-26 nuclei.jsonl --tool nuclei
 ```
 
-Standalone desktop bundles (PyInstaller) for Linux, macOS and Windows are built by CI; see [`packaging/`](packaging/).
 
 ## Development
 
@@ -128,7 +147,7 @@ cd backend && pytest -q                    # vault, local API, domain, desktop s
 cd frontend && npm run build               # type-check + production build
 offsechub --dev                            # API on :8000; run `npm run dev` in frontend/ and open the printed link
 e2e/run.sh                                 # the real app end to end: Chromium (Playwright) and the native window
-packaging/build.sh                         # standalone bundle for this OS (build.ps1 on Windows)
+packaging/build.sh                         # installer for this OS: .deb or .dmg (build.ps1 on Windows: setup.exe)
 ```
 
 ```
@@ -139,7 +158,7 @@ backend/app/cli.py         offsechub command (app, open, import, demo)
 backend/app/api/           FastAPI routers (single operator)
 backend/app/services/      scope matcher, CVSS, importers, reporting, evidence storage
 frontend/                  React 19 + TypeScript + TanStack Query
-packaging/                 PyInstaller spec and build scripts
+packaging/                 installers: PyInstaller spec, Inno Setup (Windows), disk image (macOS), .deb (Linux), smoke test
 tools/                     independent vault decoder
 e2e/                       end-to-end scenarios: browser.cjs (Playwright), native.py (pywebview under Xvfb)
 docs/                      vault format, threat model, architecture, case study

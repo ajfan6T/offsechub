@@ -47,7 +47,8 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-  desktop:
+  installers:
+    name: installer (${{ matrix.os }})
     needs: [backend, frontend]
     strategy:
       fail-fast: false
@@ -63,25 +64,86 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
-      - name: Linux GUI libraries
+
+      # Linux: a .deb on the system's WebKitGTK, installed with apt as a user would.
+      - name: Build the .deb
+        if: runner.os == 'Linux'
+        run: packaging/linux/build_deb.sh
+      - name: Install with apt, smoke test, uninstall
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgirepository-2.0-dev libcairo2-dev \
-            gir1.2-girepository-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-3.0 xvfb
-          pip install -e "./backend[gtk]"
-      - name: Build
+          sudo apt-get install -y xvfb ./dist/offsechub_*_amd64.deb
+          xvfb-run -a python packaging/smoke_test.py --app /usr/bin/offsechub
+          python packaging/smoke_test.py --app /usr/bin/offsechub --browser
+          sudo apt-get remove -y offsechub
+          test ! -e /opt/offsechub
+
+      # macOS: an app bundle in a disk image.
+      - name: Build the .dmg
+        if: runner.os == 'macOS'
         run: |
           pip install -e "./backend[build]"
-          pyinstaller packaging/offsechub.spec --noconfirm --distpath dist --workpath build/pyinstaller
-      - name: Smoke test the bundle
-        shell: bash
+          packaging/macos/build_dmg.sh
+      - name: Install from the disk image, smoke test
+        if: runner.os == 'macOS'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then exe=dist/OffsecHub/offsechub.exe
-          elif [ "$RUNNER_OS" = "macOS" ]; then exe=dist/OffsecHub.app/Contents/MacOS/offsechub
-          else exe=dist/OffsecHub/offsechub; fi
-          "$exe" version
+          hdiutil attach dist/OffsecHub-*.dmg -nobrowse -mountpoint "$RUNNER_TEMP/dmg"
+          ditto "$RUNNER_TEMP/dmg/OffsecHub.app" "$RUNNER_TEMP/Applications/OffsecHub.app"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          python packaging/smoke_test.py --app "$RUNNER_TEMP/Applications/OffsecHub.app/Contents/MacOS/offsechub"
+
+      # Windows: offsechub-setup-<version>.exe (Inno Setup).
+      - name: Build the setup.exe
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          ./packaging/build.ps1 -SkipFrontend
+      - name: Install silently, smoke test, uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\offsechub-setup-*.exe | Select-Object -First 1).FullName
+          $dir = Join-Path $env:RUNNER_TEMP "OffsecHub"
+          $log = Join-Path $env:RUNNER_TEMP "setup.log"
+          $p = Start-Process $setup -Wait -PassThru -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$dir`"", "/LOG=`"$log`""
+          if ($p.ExitCode -ne 0) { Get-Content $log; throw "setup exited with $($p.ExitCode)" }
+          python packaging/smoke_test.py --app "$dir\offsechub.exe" --cli "$dir\offsechub-cli.exe"
+          if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
+          # The uninstaller relaunches itself from %TEMP%, so wait for the files to go.
+          Start-Process "$dir\unins000.exe" -Wait -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
+          for ($i = 0; ($i -lt 60) -and (Test-Path "$dir\offsechub.exe"); $i++) { Start-Sleep 1 }
+          if (Test-Path "$dir\offsechub.exe") { throw "uninstall left the app behind" }
+
       - uses: actions/upload-artifact@v4
         with:
-          name: OffsecHub-${{ runner.os }}
-          path: dist/OffsecHub*
+          name: installer-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            dist/offsechub_*_amd64.deb
+            dist/OffsecHub-*.dmg
+            dist/offsechub-setup-*.exe
+
+  # Push a tag like v0.2.0 to publish the three installers as a GitHub release.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: installers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the app version
+        run: test "${GITHUB_REF_NAME#v}" = "$(python3 packaging/version.py)"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

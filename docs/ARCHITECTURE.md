@@ -145,7 +145,7 @@ backend/app/
   api/              domain routers (single-operator) + vault.py
   services/         scope, cvss, importers, reporting, storage (now vault-backed)
 frontend/           React app; VaultGate replaces Login
-packaging/          PyInstaller spec, build scripts
+packaging/          installers: PyInstaller spec, Inno Setup (Windows), .dmg (macOS), .deb on system WebKitGTK (Linux), installed-app smoke test
 tools/              ohvault_decrypt.py: independent, spec-only decoder (no-lock-in escape hatch)
 ```
 

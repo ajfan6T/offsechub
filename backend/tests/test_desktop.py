@@ -515,3 +515,29 @@ def test_signals_save_lock_and_clean_up(isolated_dirs, signame):
             assert get_setting(db, "operator.profile")["name"] == signame
     finally:
         manager.shutdown()
+
+
+def test_windowed_build_logs_to_a_file(isolated_dirs, monkeypatch, capsys):
+    """A windowed .exe/.app has no console: errors must land somewhere the user can find."""
+    import logging
+
+    monkeypatch.setattr(sys, "stdout", None)
+    root = logging.getLogger()
+    saved = root.handlers[:]
+    root.handlers.clear()
+    try:
+        cli._setup_logging(verbose=False)
+        assert sys.stdout is not None  # print() and uvicorn have somewhere to write
+        logging.getLogger("offsechub").error("the desktop window failed")
+        for handler in root.handlers:
+            handler.flush()
+        assert "the desktop window failed" in (isolated_dirs / "config" / "offsechub.log").read_text()
+    finally:
+        for handler in root.handlers:
+            handler.close()
+        root.handlers[:] = saved
+
+
+def test_show_message_without_dialog_only_prints(capsys):
+    desktop.show_message("OffsecHub is already running.", error=False)
+    assert "already running" in capsys.readouterr().err

@@ -113,6 +113,7 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | File sizes and timestamps | the number and size of evidence files, activity times | inherent to file-per-blob storage |
 | App config (`config.json`) | recent vault *paths*, per-vault high-water marks | "Remember recent vaults" can be switched off; on Windows it lives in Local, not Roaming, AppData |
 | `runtime.json` | port and bearer token while running | 0600 in a per-user runtime directory; deleted on exit |
+| `offsechub.log` (installed app, which has no console) | errors, warnings and vault *paths*; never vault content or secrets | in the per-user config directory; rotated at 1 MB |
 | **Exports you save** | reports (HTML, Markdown, JSON), evidence downloads, CSVs | by definition plaintext. Every export is recorded in Activity, and the UI says so. |
 | `--browser` mode | the session cookie is scoped to host `127.0.0.1`, **not the port**, so another local web server the browser later visits on 127.0.0.1 would receive it; the (already redeemed) one-time link can land in browser history | Documented as reduced-security mode with a startup warning. The link reaches the browser through a 0600 redirect page, not its command line. Use the desktop window, whose cookie jar is private and ephemeral. |
 

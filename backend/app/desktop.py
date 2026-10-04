@@ -320,6 +320,33 @@ def _ensure_std_streams() -> None:
             setattr(sys, name, open(os.devnull, "w"))  # noqa: SIM115 - process lifetime
 
 
+WINDOW_HELP = (
+    "On Windows, install the Microsoft Edge WebView2 Runtime. On Linux, install WebKitGTK "
+    "(gir1.2-webkit2-4.1). Or run OffsecHub in your browser instead: offsechub --browser "
+    "(offsechub-cli --browser on Windows)."
+)
+
+
+def show_message(text: str, *, error: bool = True, dialog: bool = False) -> None:
+    """Print, and for the windowed app also show a native dialog (there may be no console)."""
+    print(text, file=sys.stderr, flush=True)
+    if not dialog:
+        return
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(None, text, "OffsecHub", 0x10 if error else 0x40)
+        elif sys.platform == "darwin":
+            import subprocess
+
+            subprocess.run(["osascript", "-e", "on run argv", "-e",
+                            "display alert \"OffsecHub\" message (item 1 of argv)", "-e", "end run", text],
+                           check=False, timeout=600, capture_output=True)
+    except Exception:  # best effort: the message is in the log too
+        log.debug("could not show a dialog", exc_info=True)
+
+
 def write_redirect_file(url: str) -> Path:
     """A private page that forwards to ``url``.
 
@@ -354,8 +381,10 @@ def run(mode: str = "window", *, open_browser: bool = True, debug: bool = False)
         log.info("hardening: %s", measure)
 
     if mode != "dev" and (other := running_instance()) is not None:
-        print(f"OffsecHub is already running (port {other.port}). "
-              "Run `offsechub open` for a browser link to it.", file=sys.stderr)
+        message = "OffsecHub is already running. Switch to its window."
+        if mode != "window":
+            message = f"OffsecHub is already running (port {other.port}). Run `offsechub open` for a browser link to it."
+        show_message(message, error=False, dialog=mode == "window")
         return 1
 
     manager = VaultManager(AppConfig())
@@ -377,7 +406,12 @@ def run(mode: str = "window", *, open_browser: bool = True, debug: bool = False)
         except OSError as exc:  # the app still works, only the CLI can't find it
             log.warning("the CLI will not be able to reach this instance: %s", exc)
         if mode == "window":
-            _run_window(server, manager, auth, debug=debug)
+            try:
+                _run_window(server, manager, auth, debug=debug)
+            except Exception as exc:  # no GUI toolkit, no WebView2...
+                log.exception("the desktop window failed")
+                show_message(f"OffsecHub could not open its window:\n\n{exc}\n\n{WINDOW_HELP}", dialog=True)
+                return 1
         else:
             _run_foreground(server, auth, mode, open_browser=open_browser)
     finally:

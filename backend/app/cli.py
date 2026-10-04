@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import logging
+import os
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
@@ -56,10 +57,38 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
+LOG_MAX_BYTES = 1 << 20
+
+
+def _setup_logging(verbose: bool) -> None:
+    """Log to the console, or to a file for windowed builds, which have none.
+
+    The file (offsechub.log in the config directory) holds errors and vault
+    paths, never vault content.
+    """
+    windowed = sys.stdout is None or sys.stderr is None
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w"))  # noqa: SIM115 - process lifetime
+    fmt = "%(levelname)s %(name)s: %(message)s"
+    if windowed:
+        from .vault.appconfig import config_dir
+
+        path = config_dir() / "offsechub.log"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists() and path.stat().st_size > LOG_MAX_BYTES:
+                path.replace(path.with_name("offsechub.log.1"))
+            logging.basicConfig(filename=path, level=logging.INFO, format="%(asctime)s " + fmt)
+            return
+        except OSError:
+            pass
+    logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, format=fmt)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
-                        format="%(levelname)s %(name)s: %(message)s")
+    _setup_logging(args.verbose)
     if args.command == "version":
         print(f"OffsecHub {__version__}")
         return 0
