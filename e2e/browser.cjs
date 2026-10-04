@@ -33,7 +33,11 @@ const cli = (...args) =>
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("response", (r) => r.status() >= 400 && errors.push(`${r.status()} ${r.request().method()} ${r.url()}`));
-  const shot = (name, opts = {}) => page.screenshot({ path: path.join(SHOTS, `${name}.png`), ...opts });
+  const shot = async (name, opts = {}) => {
+    // Let notifications from earlier steps fade, so they don't end up in the docs.
+    await page.locator(".toast").first().waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+    await page.screenshot({ path: path.join(SHOTS, `${name}.png`), ...opts });
+  };
 
   try {
     // ---- launch: one-time link -> cookie -> welcome

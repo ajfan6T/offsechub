@@ -4,6 +4,8 @@
 
 > A portfolio project in security engineering. The interesting parts are the [vault format](docs/VAULT_FORMAT.md), the [threat model](docs/THREAT_MODEL.md), and the [case study](docs/CASE_STUDY.md) of what adversarial review found in the first design.
 
+![OffsecHub dashboard: engagements, open findings by severity and the latest findings](docs/screenshots/dashboard.png)
+
 ## Why
 
 Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, Ghostwriter, SysReptor) put that data on a server someone has to run, patch and trust. OffsecHub makes the opposite trade: a private operator workspace whose entire state is a folder of ciphertext you control. It works offline, on a Kali VM or inside a client network without egress, and it answers a client's "where is our data?" in one sentence.
@@ -24,16 +26,40 @@ Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, G
 
 ## Screenshots
 
+All taken from the real app running the sample engagement (`offsechub demo`).
+
+### Running an engagement
+
 | | |
 |---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Finding editor with CVSS 3.1 calculator](docs/screenshots/finding-editor.png) |
-| **Dashboard** of the open vault | **Finding editor**: CVSS 3.1, affected assets, linked evidence |
-| ![Scope rules](docs/screenshots/scope.png) | ![Evidence locker](docs/screenshots/evidence.png) |
-| **Scope**: include and exclude rules that imports respect | **Evidence**: encrypted into the vault, SHA-256 recorded |
-| ![Report readiness and preview](docs/screenshots/report.png) | ![Recovery key](docs/screenshots/recovery-key.png) |
-| **Report**: readiness checks and a sandboxed preview | **Recovery key**, shown once when a vault is created |
+| ![Engagement overview](docs/screenshots/overview.png) | ![Scope rules](docs/screenshots/scope.png) |
+| **Overview**: scope, targets, findings by severity, test coverage and rules of engagement | **Scope**: include and exclude rules (CIDR, host, wildcard, URL) that imports respect |
+| ![Targets](docs/screenshots/targets.png) | ![Recon imports](docs/screenshots/recon.png) |
+| **Targets** with live scope status, open services and findings | **Recon**: Nmap, nuclei and host-list imports, also from the terminal |
+| ![Testing checklists](docs/screenshots/testing.png) | ![Operator log](docs/screenshots/op-log.png) |
+| **Testing**: methodology checklists with coverage | **Operator log**: who ran what, from where, against what, for SOC deconfliction |
 
-More: the [vault picker](docs/screenshots/welcome.png) and [settings](docs/screenshots/settings.png) (password, recovery key, rekey, auto-lock, backup and evidence verification).
+### Findings, evidence and reports
+
+| | |
+|---|---|
+| ![Findings](docs/screenshots/findings.png) | ![Finding editor](docs/screenshots/finding-editor.png) |
+| **Findings** with CVSS scores and triage status | **Finding editor**: CVSS 3.1 calculator, affected assets, linked evidence |
+| ![Evidence locker](docs/screenshots/evidence.png) | ![Finding library](docs/screenshots/library.png) |
+| **Evidence**: encrypted into the vault as it streams in, SHA-256 recorded | **Finding library**: reusable write-ups with CVSS and CWE |
+
+![Report readiness checks and preview](docs/screenshots/report.png)
+
+**Report**: readiness checks, then a sandboxed preview of the client report (HTML/PDF, Markdown or JSON).
+
+### The vault
+
+| | |
+|---|---|
+| ![Vault picker](docs/screenshots/welcome.png) | ![Recovery key](docs/screenshots/recovery-key.png) |
+| **Vault picker**: recent vaults, open or create | **Recovery key**, shown once at creation, with a downloadable recovery kit |
+| ![Locked vault](docs/screenshots/locked.png) | ![Settings](docs/screenshots/settings.png) |
+| **Locked** after idle time or a lock from elsewhere, with an explanation | **Settings**: password, recovery key, rekey, auto-lock, encrypted backup, evidence verification |
 
 ## Security at a glance
 

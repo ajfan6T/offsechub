@@ -116,7 +116,7 @@ function StatsLine({ rec }: { rec: ReconImport }) {
       +{s.targets_created} targets, +{s.services_created} services
       {rec.tool === "nuclei" && <>, +{s.findings_created} findings</>}
       {skipped > 0 && <span className="warn-text">, {skipped} skipped (scope)</span>}
-      {s.errors.length > 0 && <span className="error-text">, {s.errors.length} errors</span>}
+      {s.errors.length > 0 && <span className="error-text">, {s.errors.length} {s.errors.length === 1 ? "error" : "errors"}</span>}
     </>
   );
 }
