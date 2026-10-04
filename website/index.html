@@ -75,7 +75,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 84px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body {
   margin: 0;
-  padding-inline: clamp(16px, 4vw, 44px);
+  padding-inline: clamp(16px, 3.5vw, 72px);
   background: var(--ground);
   color: var(--text);
   font: 400 17px/1.6 var(--body);
@@ -88,7 +88,8 @@ a:hover { text-decoration-thickness: 2px; }
 code, kbd, pre { font-family: var(--mono); }
 h1, h2, h3 { text-wrap: balance; margin: 0; }
 p { margin: 0; }
-.page { max-width: 1180px; margin-inline: auto; }
+/* Fills the window; the cap only matters beyond 2560-pixel screens. */
+.page { max-width: 2400px; margin-inline: auto; }
 
 /* ---------------------------------------------------------------- top bar */
 .bar {
@@ -146,9 +147,14 @@ h2 { font: 650 clamp(1.7rem, 3.3vw, 2.6rem)/1.1 var(--display); font-stretch: 87
 /* ---------------------------------------------------------------- hero */
 .hero { padding-block: clamp(48px, 8vw, 96px) clamp(56px, 8vw, 96px); }
 .hero-copy { display: grid; gap: 22px; max-width: 54rem; }
+.hero-title, .hero-aside { display: grid; gap: 22px; align-content: end; min-width: 0; }
+@media (min-width: 1280px) {
+  .hero-copy { max-width: none; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); column-gap: clamp(40px, 5vw, 120px); align-items: end; }
+  .hero-aside { padding-bottom: 0.4rem; }
+}
 .hero-tag { font: 500 13px var(--mono); color: var(--muted); }
 .hero-tag b { color: var(--text); font-weight: 500; }
-h1 { font: 760 clamp(2.15rem, 5.6vw, 4.6rem)/1 var(--display); font-stretch: 81%; letter-spacing: -0.045em; }
+h1 { font: 760 clamp(2.15rem, 4.9vw, 6.2rem)/1 var(--display); font-stretch: 81%; letter-spacing: -0.045em; }
 h1 em { font-style: normal; color: var(--signal); }
 .hero-sub { font-size: clamp(1.05rem, 1.6vw, 1.22rem); color: var(--muted); max-width: 44rem; }
 .hero-sub b { color: var(--text); font-weight: 500; }
@@ -208,8 +214,14 @@ h1 em { font-style: normal; color: var(--signal); }
   .track li { padding: 4px 0 18px 22px; }
   .track li::after { top: 9px; left: -5px; }
 }
-.showcase { margin-top: clamp(40px, 6vw, 64px); display: grid; gap: 14px; }
+.showcase { margin-top: clamp(40px, 6vw, 64px); display: grid; gap: 28px; }
+.showcase figure { margin: 0; display: grid; gap: 14px; align-content: start; min-width: 0; }
 .showcase figcaption { font-size: 14px; color: var(--muted); }
+.showcase .wide-only { display: none; }
+@media (min-width: 1400px) {
+  .showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .showcase .wide-only { display: grid; }
+}
 
 /* ---------------------------------------------------------------- why */
 .findings { border: 1px solid var(--rule); border-radius: 12px; background: var(--panel); overflow: hidden; }
@@ -355,16 +367,20 @@ body.is-locked .scrambled { color: var(--muted); }
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-copy">
-    <p class="hero-tag">For penetration testers · <b>Windows</b> · <b>macOS</b> · <b>Linux</b></p>
-    <h1 id="hero-title">Your client's attack map stays on <em>your disk</em>, encrypted.</h1>
-    <p class="hero-sub">OffsecHub is a desktop workspace for penetration tests. <b>Scope, targets, recon imports, testing checklists, evidence, findings and the report</b> live in one encrypted vault on your own machine. No server, no account, nothing leaves your disk.</p>
-    <div class="cta">
-      <a class="btn btn-primary" id="hero-download" href="#download">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0-3.5-3.5M8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Download OffsecHub</span>
-      </a>
-      <a class="btn btn-ghost" href="https://github.com/ajfan6T/offsechub">Source on GitHub</a>
-      <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+ (Apple silicon), Debian/Ubuntu/Kali</span>
+    <div class="hero-title">
+      <p class="hero-tag">For penetration testers · <b>Windows</b> · <b>macOS</b> · <b>Linux</b></p>
+      <h1 id="hero-title">Your client's attack map stays on <em>your disk</em>, encrypted.</h1>
+    </div>
+    <div class="hero-aside">
+      <p class="hero-sub">OffsecHub is a desktop workspace for penetration tests. <b>Scope, targets, recon imports, testing checklists, evidence, findings and the report</b> live in one encrypted vault on your own machine. No server, no account, nothing leaves your disk.</p>
+      <div class="cta">
+        <a class="btn btn-primary" id="hero-download" href="#download">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0-3.5-3.5M8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Download OffsecHub</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/ajfan6T/offsechub">Source on GitHub</a>
+        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+ (Apple silicon), Debian/Ubuntu/Kali</span>
+      </div>
     </div>
   </div>
 
@@ -444,13 +460,22 @@ Remediation: block /.git/ at the web server.</textarea>
     <li><h3>Findings</h3><p>CVSS 3.1 calculator, CWE, a triage workflow and a library of reusable write-ups.</p></li>
     <li><h3>Report</h3><p>Readiness checks, then HTML (print to PDF), Markdown or JSON with an evidence appendix.</p></li>
   </ol>
-  <figure class="showcase">
-    <div class="frame">
-      <div class="frame-bar"><span>OffsecHub · Demo vault</span><span>Dashboard</span></div>
-      <img src="screenshots/dashboard.png" width="1440" height="900" alt="The OffsecHub dashboard: active engagements, open findings by severity and the latest findings" loading="lazy">
-    </div>
-    <figcaption>The dashboard of the sample vault you get with <code>offsechub demo</code>.</figcaption>
-  </figure>
+  <div class="showcase">
+    <figure>
+      <div class="frame">
+        <div class="frame-bar"><span>OffsecHub · Demo vault</span><span>Dashboard</span></div>
+        <img src="screenshots/dashboard.png" width="1440" height="900" alt="The OffsecHub dashboard: active engagements, open findings by severity and the latest findings" loading="lazy">
+      </div>
+      <figcaption>The dashboard of the sample vault you get with <code>offsechub demo</code>.</figcaption>
+    </figure>
+    <figure class="wide-only">
+      <div class="frame">
+        <div class="frame-bar"><span>OffsecHub · ACME-EXT-26</span><span>Finding</span></div>
+        <img src="screenshots/finding-editor.png" width="1440" height="900" alt="The finding editor with its CVSS 3.1 calculator, affected assets and linked evidence" loading="lazy">
+      </div>
+      <figcaption>A finding: CVSS 3.1 calculator, affected assets and linked evidence.</figcaption>
+    </figure>
+  </div>
 </section>
 
 <section id="why" aria-labelledby="why-title">
@@ -747,7 +772,7 @@ Remediation: block /.git/ at the web server.</textarea>
         } else {
           line += "  ";
         }
-        line += i - row === perRow / 2 - 1 ? "  " : " ";
+        line += (i - row) % 8 === 7 ? "  " : " ";
       }
       html += `${line} <span class="asc">${ascii}</span>\n`;
     }
@@ -761,7 +786,22 @@ Remediation: block /.git/ at the web server.</textarea>
     timer: 0,
     last: null,
   };
-  const narrow = matchMedia("(max-width: 640px)");
+  // Bytes per row: the most (in groups of 8, up to 32) that fit the pane's width.
+  // A row of n bytes takes 10 + 4n + n/8 characters (offset, hex, gaps, ASCII).
+  const hexBox = $(".hex-scroll");
+  let perRow = 16;
+  function fitPerRow() {
+    const probe = document.createElement("span");
+    probe.textContent = "0".repeat(40);
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
+    $("#hexdump").appendChild(probe);
+    const ch = probe.getBoundingClientRect().width / 40 || 8;
+    probe.remove();
+    const chars = Math.floor((hexBox.clientWidth - 32) / ch);
+    let n = 8;
+    while (n < 32 && 10 + 4 * (n + 8) + (n + 8) / 8 <= chars) n += 8;
+    return n;
+  }
   async function reseal() {
     if (!subtle) return;
     const text = new TextEncoder().encode($("#plaintext").value);
@@ -773,14 +813,20 @@ Remediation: block /.git/ at the web server.</textarea>
     $("#hex-meta").textContent = `db.enc · ${demo.last.length} bytes`;
   }
   function paintDump() {
-    if (demo.last) $("#hexdump").innerHTML = renderDump(demo.last, narrow.matches ? 8 : 16);
+    if (demo.last) $("#hexdump").innerHTML = renderDump(demo.last, perRow);
   }
   if (subtle) {
     $("#plaintext").addEventListener("input", () => {
       clearTimeout(demo.timer);
       demo.timer = setTimeout(reseal, 120);
     });
-    narrow.addEventListener("change", paintDump);
+    perRow = fitPerRow();
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(() => {
+        const n = fitPerRow();
+        if (n !== perRow) { perRow = n; paintDump(); }
+      }).observe(hexBox);
+    }
     reseal();
   } else {
     $("#hex-meta").textContent = "needs a secure context (https) for WebCrypto";
