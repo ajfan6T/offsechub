@@ -179,6 +179,8 @@ h1 em { font-style: normal; color: var(--signal); }
 #hexdump { font: 13px/1.75 var(--mono); white-space: pre; font-variant-numeric: tabular-nums; color: var(--text); }
 #hexdump .off, #hexdump .asc { color: var(--muted); }
 #hexdump .asc { opacity: 0.75; }
+/* Phones: an 8-byte row (44 characters) fits a 360-pixel screen without scrolling. */
+@media (max-width: 480px) { .hex-scroll { padding-inline: 12px; } #hexdump { font-size: 12px; } }
 .b-magic { color: var(--f-magic); font-weight: 500; }
 .b-version { color: var(--f-version); }
 .b-id { color: var(--f-id); }
