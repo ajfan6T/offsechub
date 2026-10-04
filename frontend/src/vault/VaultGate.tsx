@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 import { api, setApiEvents } from "../api";
 import { Button, ErrorBox, Loading } from "../components/ui";
 import type { VaultStatus } from "../types";
@@ -31,6 +32,7 @@ const INPUT_EVENTS = ["keydown", "pointerdown", "wheel", "touchstart"] as const;
  */
 export function VaultGate({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [sessionLost, setSessionLost] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
   const [pendingKey, setPendingKey] = useState<{ key: string; reason: RecoveryKeyReason } | null>(null);
@@ -76,6 +78,18 @@ export function VaultGate({ children }: { children: ReactNode }) {
     }
   }, [state, sessionLost, qc]);
 
+  // A lock this window didn't ask for (idle timer, CLI, another tab) closed
+  // whatever page was open: say so on the unlock screen.
+  const selfLock = useRef(false);
+  const prevState = useRef(state);
+  useEffect(() => {
+    if (prevState.current === "unlocked" && state === "locked") {
+      if (!selfLock.current) setInterrupted(true);
+      selfLock.current = false;
+    }
+    prevState.current = state;
+  }, [state]);
+
   useActivityHeartbeat(state === "unlocked" && !sessionLost);
 
   const setStatus = useCallback((s: VaultStatus) => void qc.setQueryData(STATUS_KEY, s), [qc]);
@@ -101,14 +115,24 @@ export function VaultGate({ children }: { children: ReactNode }) {
               setStatus(next);
               void qc.invalidateQueries({ queryKey: RECENT_KEY });
             },
-            lock: async () => setStatus(await api.post<VaultStatus>("/api/vault/lock")),
+            lock: async () => {
+              selfLock.current = true;
+              try {
+                setStatus(await api.post<VaultStatus>("/api/vault/lock"));
+              } catch (err) {
+                selfLock.current = false;
+                throw err;
+              }
+            },
             close: async () => {
               setInterrupted(false);
-              setStatus(await api.post<VaultStatus>("/api/vault/close"));
+              const next = await api.post<VaultStatus>("/api/vault/close");
+              navigate("/", { replace: true }); // the next vault opens on its dashboard
+              setStatus(next);
             },
           }
         : null,
-    [status, setStatus, refreshStatus, qc],
+    [status, setStatus, refreshStatus, qc, navigate],
   );
 
   if (sessionLost) return <SessionLost />;

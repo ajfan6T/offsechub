@@ -49,7 +49,7 @@ Before implementing, I wrote the format spec and architecture doc and ran five i
 | Finding | Fix |
 |---|---|
 | **Plaintext on disk.** Starlette spools multipart uploads over 1 MiB to temp files, and in-memory SQLite spills sorts to TMPDIR. | Raw-body streaming uploads straight into the encryptor, and `PRAGMA temp_store=MEMORY`. The false "never touches disk" wording was also replaced with a precise list of what does. |
-| **pywebview's JS bridge dispatches arbitrary dotted paths** (`method.__globals__…`), so one XSS reaches the Python host. | Patch the dispatcher to an allow-list of two flat methods, and keep vault references out of the bridge. |
+| **pywebview's JS bridge dispatches arbitrary dotted paths** (`method.__globals__…`), so one XSS reaches the Python host. | Replace the dispatcher with an allow-list of exact names (three native dialogs), pass no JS API object, and keep vault references out of the bridge. |
 | **Changing the password didn't revoke old copies:** the same master key sat behind every header in sync history. | A real **rekey**. The docs now state exactly what each operation guarantees. |
 | **Deleting, adding or rolling back keyslots went undetected.** | A whole-header HMAC keyed from the master key, a revision counter, and an authenticated copy inside the database. |
 | **A corrupted `db.enc` forced a silent rollback** and then rotated itself over the good backup. | Quarantine the bad file, never rotate an unauthenticated file into `.bak`, and warn the user. |
@@ -57,11 +57,22 @@ Before implementing, I wrote the format spec and architecture doc and ran five i
 | **Background polling and CLI automation kept the vault unlocked forever.** | Only UI changes and an explicit input heartbeat count as activity. |
 | **Recovery-key typos were undetectable.** | A 16-bit checksum plus a Crockford mod-37 check symbol. 37 is prime and larger than the alphabet, so *every* single-character typo and adjacent transposition is caught, as an exhaustive test confirms. My first version had a 16-bit hash only, and its "detects every typo" test failed about 2.6% of the time. |
 
+### What only the real window showed
+
+Unit tests and a design review can't see how the pieces behave together. Driving the finished app end to end, in a real WebKitGTK window under Xvfb and in Chromium via Playwright, found three bugs that every unit test had passed:
+
+| Bug | Why the tests missed it | Fix |
+|---|---|---|
+| **The JS bridge never appeared in the window.** pywebview builds its page-side API with `new Function` and returns results through `eval`, and the app's own CSP blocks both. Native dialogs silently fell back to text fields, and since the webview's downloads are off by design, every export button did nothing. | The dispatcher tests called Python directly; nothing ran pywebview's JavaScript under the CSP. | Rebuild both halves without `eval` rather than add `'unsafe-eval'` (ADR 9). A new test runs pywebview's real `api.js` in Node with string code generation disabled: the stock bridge throws `EvalError`, the replacement works. |
+| **Quitting with Ctrl+C or `kill` skipped cleanup.** uvicorn re-raises SIGINT/SIGTERM after its own shutdown; with the default handler in place, the process died before deleting `runtime.json`. The vault itself was saved (by the server's shutdown hook), but the CLI then found a stale token. | The server was never run as a real process under a real signal. | Benign handlers before serving. `test_signals_save_lock_and_clean_up` now runs the app as a subprocess and sends each of SIGTERM, SIGHUP and SIGINT. |
+| **`runtime.json` appeared before the server listened,** so a fast `offsechub import` hit a closed port. | Same. | Publish it only once the API answers; covered by `test_runtime_file_exists_only_while_serving`. |
+
 ### What I'd tell an interviewer
 
 - **The review paid for itself.** Most of the data-loss bugs above would only have shown up in the field: on a full disk, an unplugged USB drive, a Windows machine running Defender, or a vault that grew past 2 GiB.
 - **Honest limits are a feature.** Python can't guarantee wiping memory. `--browser` mode cookies aren't port-scoped. A rollback on a different machine is undetectable. The fingerprints are integrity checks, not chain of custody. Saying so, and designing around it, is more convincing than claiming otherwise.
 - **"Can someone else implement your format?"** Yes: `tools/ohvault_decrypt.py` does, in about 200 lines, and CI proves it on every commit.
+- **Run the real thing.** The worst integration bug, a security control (the CSP) silently disabling a feature (the bridge), passed every unit test. Ten minutes of driving the actual window found it.
 
 ## 5. Trade-offs I'd revisit with more time
 

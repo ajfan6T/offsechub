@@ -22,6 +22,19 @@ Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, G
 | **Operator log** | Who ran what, from where, against what, with the outcome, for SOC deconfliction. Exports to CSV. |
 | **CLI** | `offsechub import ACME-EXT-26 scan.xml --tool nmap` pushes results into the running app |
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Finding editor with CVSS 3.1 calculator](docs/screenshots/finding-editor.png) |
+| **Dashboard** of the open vault | **Finding editor**: CVSS 3.1, affected assets, linked evidence |
+| ![Scope rules](docs/screenshots/scope.png) | ![Evidence locker](docs/screenshots/evidence.png) |
+| **Scope**: include and exclude rules that imports respect | **Evidence**: encrypted into the vault, SHA-256 recorded |
+| ![Report readiness and preview](docs/screenshots/report.png) | ![Recovery key](docs/screenshots/recovery-key.png) |
+| **Report**: readiness checks and a sandboxed preview | **Recovery key**, shown once when a vault is created |
+
+More: the [vault picker](docs/screenshots/welcome.png) and [settings](docs/screenshots/settings.png) (password, recovery key, rekey, auto-lock, backup and evidence verification).
+
 ## Security at a glance
 
 - **Encryption at rest.**
@@ -41,7 +54,8 @@ Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, G
   - A recovery key with a check symbol that catches every single typo.
   - A recovery kit that restores access even if the vault header is lost.
   - A rekey operation for suspected compromise.
-- **Local API hardening.** A one-time launch token, an exact Host allow-list against DNS rebinding, CSRF and Origin checks, and a pywebview JS bridge patched to an allow-list.
+- **Local API hardening.** A one-time launch token, an exact Host allow-list against DNS rebinding, CSRF and Origin checks, and a strict CSP (no inline script, no `eval`).
+- **A three-function JS bridge.** pywebview's dispatcher walks dotted attribute paths from page script. OffsecHub replaces it with exact allow-listed names and rebuilds the bridge without `eval`, so it works under the CSP. All three functions open a native dialog the user has to confirm.
 - **Plaintext stays off disk.** In-memory SQLite with in-memory temp storage, streaming uploads (no multipart spooling), no access logs, and no core dumps.
 - **No lock-in.** [`tools/ohvault_decrypt.py`](tools/ohvault_decrypt.py) is an independent decoder written only from the spec. It decrypts your vault without OffsecHub.
 
@@ -61,6 +75,7 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"            # add ".[gtk]" on Linux for the native window
 offsechub                          # opens the desktop window
 offsechub --browser                # no WebKit (e.g. minimal Kali/WSL): reduced-security browser mode
+offsechub open                     # a fresh one-time browser link to the running app
 ```
 
 Try it with sample data:
@@ -83,18 +98,21 @@ Standalone desktop bundles (PyInstaller) for Linux, macOS and Windows are built 
 ## Development
 
 ```bash
-cd backend && pytest -q                    # backend + vault + security suites
+cd backend && pytest -q                    # vault, local API, domain, desktop shell, fuzzing
 cd frontend && npm run build               # type-check + production build
-offsechub --dev                            # with `npm run dev` in frontend/ for hot reload
+offsechub --dev                            # API on :8000; run `npm run dev` in frontend/ and open the printed link
+packaging/build.sh                         # standalone bundle for this OS (build.ps1 on Windows)
 ```
 
 ```
 backend/app/vault/         encrypted vault: crypto, header, manager, durable I/O, hardening
 backend/app/localauth.py   localhost API authentication (launch token, Host/Origin/CSRF)
 backend/app/desktop.py     pywebview shell, hardened JS bridge, server lifecycle
+backend/app/cli.py         offsechub command (app, open, import, demo)
 backend/app/api/           FastAPI routers (single operator)
 backend/app/services/      scope matcher, CVSS, importers, reporting, evidence storage
 frontend/                  React 19 + TypeScript + TanStack Query
+packaging/                 PyInstaller spec and build scripts
 tools/                     independent vault decoder
 docs/                      vault format, threat model, architecture, case study
 ```

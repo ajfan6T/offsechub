@@ -476,3 +476,42 @@ def test_cli_demo_creates_a_vault_and_prints_the_recovery_key_once(isolated_dirs
     finally:
         manager.shutdown()
     assert cli.main(["demo", str(isolated_dirs / "Demo"), "--password-stdin"]) == 1  # never overwrites
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX signals")
+@pytest.mark.parametrize("signame", ["SIGTERM", "SIGHUP", "SIGINT"])
+def test_signals_save_lock_and_clean_up(isolated_dirs, signame):
+    """Ctrl+C, kill and closing the terminal all save and lock before exiting.
+
+    uvicorn re-raises the signals it handled after shutting down; with default
+    handlers that killed the process before runtime.json was removed.
+    """
+    import signal as signals
+    import time
+
+    proc = subprocess.Popen([sys.executable, "-m", "app", "--browser", "--no-open"],
+                            cwd=Path(__file__).resolve().parents[1],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 20
+        while read_runtime() is None:
+            assert proc.poll() is None and time.monotonic() < deadline, proc.stderr.read()
+            time.sleep(0.05)
+        client = LocalClient.from_runtime()
+        client.json("POST", "/api/vault/create", {"path": str(isolated_dirs / "v"), "password": PASSWORD})
+        client.json("PUT", "/api/profile", {"name": signame, "email": "", "organization": ""})
+        proc.send_signal(getattr(signals, signame))
+        assert proc.wait(30) == 0, proc.stderr.read()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+    assert read_runtime() is None
+    manager = VaultManager(AppConfig())
+    try:
+        manager.unlock(isolated_dirs / "v.ohvault", password=PASSWORD)  # the vault lock was released
+        with manager.require().session() as db:
+            from app.bootstrap import get_setting
+
+            assert get_setting(db, "operator.profile")["name"] == signame
+    finally:
+        manager.shutdown()

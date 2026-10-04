@@ -224,12 +224,16 @@ export function Field({
   children: ReactNode;
   wide?: boolean;
 }) {
+  // The hint sits outside the <label>, so a control's accessible name is just
+  // its label, not the label plus help text, strength meters or errors.
   return (
-    <label className={`field ${wide ? "field-wide" : ""}`}>
-      <span className="field-label">{label}</span>
-      {children}
+    <div className={`field ${wide ? "field-wide" : ""}`}>
+      <label className="field-control">
+        <span className="field-label">{label}</span>
+        {children}
+      </label>
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
+    </div>
   );
 }
 

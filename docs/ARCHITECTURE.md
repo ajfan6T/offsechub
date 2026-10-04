@@ -15,7 +15,7 @@ OffsecHub is a **single-operator, local-first desktop application**. All engagem
 ┌──────────────────────── OffsecHub (one process) ─────────────────────────┐
 │  Desktop shell  (pywebview: WebKitGTK / WKWebView / WebView2)            │
 │    • loads http://127.0.0.1:<port>/_launch?token=<one-time token>        │
-│    • JS bridge (window.pywebview.api): native Open/Save dialogs           │
+│    • JS bridge: 3 functions, each a native dialog (folder, vault, save)  │
 │  ───────────────────────────────────────────────────────────────────── │
 │  Local API  (FastAPI + uvicorn in a background thread)                   │
 │    • bound to 127.0.0.1 on an ephemeral port                             │
@@ -35,6 +35,15 @@ OffsecHub is a **single-operator, local-first desktop application**. All engagem
 
 The same process can run **headless** (`offsechub --browser`) on machines without WebKit, such as minimal Kali or WSL. It then opens the system browser at the one-time launch URL. Everything else is identical.
 
+### Shell lifecycle (`desktop.py`)
+
+1. Harden the process (no core dumps; on Linux, not ptrace-able by the same user).
+2. Refuse to start if another instance answers on the port in `runtime.json`.
+3. Bind `127.0.0.1:0` ourselves (with `SO_EXCLUSIVEADDRUSE` on Windows), so the port is known before uvicorn starts. uvicorn runs in a background thread with no access log and no WebSocket support.
+4. Publish `runtime.json` (port and bearer token, 0600) **only once the API answers**, so the CLI never finds a dead port.
+5. Open the window at the one-time launch URL (private, ephemeral cookie jar; text selection on; the engine's own downloads off).
+6. On window close, SIGINT, SIGTERM or SIGHUP: stop the server, whose shutdown flushes and locks the vault, then delete `runtime.json`. uvicorn re-raises the signals it handled once it stops, so the shell installs harmless handlers first; otherwise the default SIGTERM action would kill the process before its cleanup ran.
+
 ## Local API hardening
 
 A localhost HTTP server can be reached by other local users, other processes and web pages the user visits (via DNS rebinding or CSRF). Each of these is handled. The full mapping from threat to control to test is in [THREAT_MODEL.md](THREAT_MODEL.md).
@@ -45,9 +54,10 @@ A localhost HTTP server can be reached by other local users, other processes and
 | DNS rebinding | The Host header must be **exactly** `127.0.0.1:<port>` or `localhost:<port>`. A missing Host or an alternate loopback spelling gets a 421. |
 | CSRF from a page in the user's browser | SameSite=Strict, a required `X-Requested-With` header on unsafe methods, and an exact Origin match when Origin is present (`null` is refused). |
 | Token leakage | The launch token is single-use; `/_launch` redirects to `/`. Access logging is off. `Referrer-Policy: no-referrer`. |
-| XSS turning into host compromise | Strict CSP, React escaping, evidence never rendered as HTML, and a fully sandboxed report iframe. pywebview's bridge dispatcher walks dotted attribute paths, so it is **patched to an allow-list** of two flat methods (native folder pickers). |
+| XSS turning into host compromise | Strict CSP (`script-src 'self'`, no `eval`), React escaping, evidence never rendered as HTML, and a fully sandboxed report iframe. pywebview's bridge dispatcher walks dotted attribute paths from page script, so OffsecHub **replaces it**: no JS API object, and only three exact, allow-listed names (`pick_folder`, `pick_vault`, `save_download`), each of which opens a native dialog and checks that the calling page is OffsecHub's own. A navigation guard sends the window back to the app if anything navigates it away. |
+| Downloads | The webview's own downloads are off: WKWebView re-fetches them without the session cookie, and other engines save silently. `save_download` shows a native *Save as* dialog, accepts only a same-origin `/api/…` path, fetches it with the bearer token and writes it atomically. In a browser the same links are ordinary downloads. |
 | Terminal automation | `offsechub import …` reads `runtime.json` (0600, per-user runtime directory; ownership and permissions are checked). Bearer requests never reset the auto-lock timer. |
-| `--browser` mode | **Reduced security, and says so at startup.** Cookies are scoped to the host, not the port, so another local web server could receive the session cookie, and the one-time link can land in browser history. The desktop window's cookie jar is private and ephemeral. |
+| `--browser` mode | **Reduced security, and says so at startup.** Cookies are scoped to the host, not the port, so another local web server could receive the session cookie, and the one-time link can land in browser history. The cookie name carries the port, so two instances don't overwrite each other's sessions. The browser is opened on a 0600 redirect page in the runtime directory, never with the token on its command line, where other local users could read it with `ps` and race to redeem it. The desktop window's cookie jar is private and ephemeral. |
 
 ## Concurrency and persistence
 
@@ -129,7 +139,9 @@ backend/app/
                     fsync/rename), fslock.py, appconfig.py (recent vaults, high-water marks,
                     runtime.json), hardening.py (no core dumps, no same-user ptrace)
   localauth.py      launch token, session cookie, Host/Origin/CSRF middleware
-  desktop.py        entry point: starts uvicorn on 127.0.0.1:0, opens pywebview or the browser, JS bridge
+  desktop.py        shell: uvicorn on a pre-bound 127.0.0.1 socket, pywebview window or browser, JS bridge
+  localclient.py    bearer-token client for the running app (CLI, save_download)
+  cli.py            offsechub [--browser|--dev] | open | import | demo | version
   api/              domain routers (single-operator) + vault.py
   services/         scope, cvss, importers, reporting, storage (now vault-backed)
 frontend/           React app; VaultGate replaces Login
@@ -151,3 +163,4 @@ tools/              ohvault_decrypt.py: independent, spec-only decoder (no-lock-
    - *Gain:* no 2 GiB AES-GCM message cap, and a streaming cipher.
    - *Cost:* the database ceiling is set explicitly instead (1 GiB, via `max_page_count`), because RAM use is about 3× the database size while saving. A warning appears at 256 MB.
 8. **Refuse, don't repair, what we don't understand.** A newer snapshot or header version is an "upgrade OffsecHub" error, never quarantine or fallback.
+9. **Rebuild the bridge rather than relax the CSP.** pywebview creates its page-side API with `new Function` and returns results through `eval`, both of which `script-src 'self'` blocks. Adding `'unsafe-eval'` would have been a one-word fix that weakens the main XSS control for every page. Instead the shell injects a closure-based `_createApi` and returns results with `run_js` as JSON literals. A test runs pywebview's real `api.js` in Node with string code generation disabled to prove both halves.

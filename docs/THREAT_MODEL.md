@@ -11,7 +11,7 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
  │                                                                                    │
  │  ┌──────────── OffsecHub process (trusted while unlocked) ────────────┐           │
  │  │  webview (pywebview) ──HTTP──▶ local API ──▶ vault manager ──┐      │           │
- │  │      ▲  JS bridge (allow-listed: 2 dialogs)                  │      │           │
+ │  │      ▲  JS bridge (allow-listed: 3 native dialogs)           │      │           │
  │  └──────┼──────────────────────────────────────────────────────┼──────┘           │
  │         │ B1: renderer ↔ Python                  B3: process ↔ disk│                │
  │   B2: localhost TCP (127.0.0.1:<random>)                         ▼                  │
@@ -68,6 +68,7 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | A corrupted `db.enc` forcing a silent rollback and destroying the backup | Fallback to `.bak` raises a warning. The bad file is quarantined and never rotated into `.bak`. | `test_tampered_database_is_quarantined_and_backup_kept` |
 | Losing or corrupting `vault.json` | A mirror copy, an in-database copy, and a **recovery kit** (the recovery slot on its own) that re-opens a vault with every header copy lost. | `test_damaged_primary_header…`, `test_recovery_kit_restores…` |
 | Crashes, full disks, removed drives | A unique tmp per save, a hard-linked `.bak`, fsync with `F_FULLFSYNC` on macOS and write-through renames on Windows. A failed flush keeps the sealed snapshot and retries; on exit it leaves an encrypted rescue copy. Group commit means a 2xx is on disk. | `test_failed_flush_on_lock_keeps_the_data`, `test_recovered_tmp_survives…`, `test_interrupted_save…` |
+| Quitting (window close, Ctrl+C, `kill`, closing the terminal) mid-session | Every exit path stops the server, whose shutdown seals, saves and locks the vault. | `test_signals_save_lock_and_clean_up` |
 | Two instances writing the same vault | An OS advisory lock, released automatically on crash. | `test_second_instance_cannot_open_the_same_vault` |
 
 ### The local API (A4, A5)
@@ -85,7 +86,9 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | Threat | Control | Proof |
 |---|---|---|
 | Stored XSS via scanner output or evidence | React escaping; a CSP with no inline script; evidence never rendered as HTML (only raster images inline; everything else a sandboxed attachment); reports autoescaped and served with a no-script CSP; the report preview iframe fully sandboxed. | report escaping tests, `test_only_raster_images_are_served_inline` |
-| XSS escalating to the host through the JS bridge | pywebview dispatches dotted attribute paths without an allow-list (`fn.__globals__…`). OffsecHub **patches the dispatcher** so only two flat method names are callable (native folder dialogs), and those hold no references to the vault. | `test_desktop.py` bridge tests |
+| XSS escalating to the host through the JS bridge | pywebview dispatches dotted attribute paths without an allow-list (`fn.__globals__…`). OffsecHub passes no JS API object and **replaces the dispatcher**: only three exact names are callable, each opens a native dialog the user must confirm, each checks that the calling page is OffsecHub's own, and none holds a reference to the vault. `save_download` accepts only a same-origin `/api/` path. | `test_bridge_dispatch_refuses_everything_but_exposed_names`, `test_bridge_functions_only_serve_the_app_page`, `test_download_paths_refused` |
+| Script in the page navigating the window elsewhere (phishing inside the app frame) | A navigation guard reloads the app if the window leaves its origin; external links open in the system browser. | `test_navigation_guard_returns_to_the_app` |
+| Weakening the CSP to make the bridge work | pywebview needs `eval` and `new Function`. OffsecHub rebuilds both halves of the bridge without them instead of allowing `'unsafe-eval'`. | `test_page_side_api_works_without_eval` |
 | Hostile XML in imports | `defusedxml`, which rejects entity expansion and external entities. | `test_xml_entity_expansion_is_rejected`, `test_external_entities_are_rejected` |
 
 ## 5. Security-relevant design decisions
@@ -111,7 +114,7 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | App config (`config.json`) | recent vault *paths*, per-vault high-water marks | "Remember recent vaults" can be switched off; on Windows it lives in Local, not Roaming, AppData |
 | `runtime.json` | port and bearer token while running | 0600 in a per-user runtime directory; deleted on exit |
 | **Exports you save** | reports (HTML, Markdown, JSON), evidence downloads, CSVs | by definition plaintext. Every export is recorded in Activity, and the UI says so. |
-| `--browser` mode | the session cookie is scoped to host `127.0.0.1`, **not the port**, so another local web server the browser later visits on 127.0.0.1 would receive it; the one-time link can land in browser history | Documented as reduced-security mode with a startup warning. Use the desktop window, whose cookie jar is private and ephemeral. |
+| `--browser` mode | the session cookie is scoped to host `127.0.0.1`, **not the port**, so another local web server the browser later visits on 127.0.0.1 would receive it; the (already redeemed) one-time link can land in browser history | Documented as reduced-security mode with a startup warning. The link reaches the browser through a 0600 redirect page, not its command line. Use the desktop window, whose cookie jar is private and ephemeral. |
 
 ## 8. Residual risks and roadmap
 
