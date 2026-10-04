@@ -3,6 +3,14 @@ name: CI
 on:
   push:
   pull_request:
+  # Actions > CI > Run workflow > "Publish a release": the same as pushing a
+  # v<version> tag, for when tags can't be pushed (the job creates the tag).
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a release for the version in backend/app/__init__.py
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,7 +59,7 @@ jobs:
   # OS, plus a rehearsal of the signing pipelines (see docs/CODE_SIGNING.md).
   installers:
     name: installer (${{ matrix.os }})
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.release }}
     needs: [backend, frontend]
     strategy:
       fail-fast: false
@@ -97,7 +105,7 @@ jobs:
   # Without credentials they are built unsigned, with a warning.
   release-installers:
     name: signed installer (${{ matrix.os }})
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release }}
     needs: [backend, frontend]
     environment: release
     permissions:
@@ -164,15 +172,20 @@ jobs:
             dist/offsechub-setup-*.exe
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release }}
     needs: release-installers
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: The tag matches the app version
-        run: test "${GITHUB_REF_NAME#v}" = "$(python3 packaging/version.py)"
+      - name: Release tag from the app version
+        run: |
+          version="$(python3 packaging/version.py)"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "$GITHUB_REF_NAME" = "v$version" || { echo "tag $GITHUB_REF_NAME does not match version $version" >&2; exit 1; }
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           pattern: installer-*
@@ -188,5 +201,8 @@ jobs:
         run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: OffsecHub ${{ env.VERSION }}
           files: dist/*
           generate_release_notes: true

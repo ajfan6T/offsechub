@@ -53,3 +53,17 @@ jobs:
       - id: deployment
         if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@v4
+      - name: Check the live site
+        if: steps.deployment.outcome == 'success'
+        env:
+          URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS "$URL" | grep -q "<title>OffsecHub</title>" && break
+            sleep 5
+          done
+          curl -fsS "$URL" | grep -q "<title>OffsecHub</title>"
+          for path in fonts/MartianMono-var.woff2 screenshots/dashboard.png; do
+            curl -fsS -o /dev/null -w "%{http_code} $URL$path\n" "$URL$path"
+          done
+          echo "Live at $URL"

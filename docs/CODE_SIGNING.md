@@ -27,7 +27,7 @@ The pipeline is already built. Once the credentials below are in the repository'
 ### Where the credentials live
 
 - **Only tag builds can use them.** They are stored in a GitHub *environment* called `release`, and only the `release-installers` job references it. That job runs for tags like `v0.2.1`, never for branches or pull requests.
-- **Restrict the environment to tags.** In *Settings → Environments → release*, add a deployment rule for tags matching `v*`. Optionally, require a reviewer before each release.
+- **Restrict the environment.** In *Settings → Environments → release*, add a deployment rule for tags matching `v*`. Optionally, require a reviewer before each release. A tag-only rule blocks the manual *Run workflow* route below, which runs on a branch; to keep that route, also allow the default branch, or rely on the required reviewer.
 - **Windows stores no secret at all.** GitHub's OpenID Connect token is exchanged for a short-lived Azure token that only the `release` environment can obtain. The private key never leaves Microsoft's HSMs.
 - **The macOS certificate is temporary on CI.** It is imported into a throwaway keychain on the runner and disappears with it.
 
@@ -88,8 +88,10 @@ The hardened runtime makes two exceptions for the embedded Python, listed in [`e
 ## Releasing
 
 1. Set the new version in `backend/app/__init__.py` and commit.
-2. Tag and push: `git tag v0.2.1 && git push origin v0.2.1`. The tag must match the version.
-3. CI builds, signs, notarizes, installs and smoke-tests on all three systems. It then publishes a GitHub release with the installers and `SHA256SUMS`.
+2. Start the release in one of two ways:
+   - Tag and push: `git tag v0.2.1 && git push origin v0.2.1`. The tag must match the version.
+   - Or, without pushing a tag: *Actions → CI → Run workflow*, tick **Publish a release**. CI creates the `v<version>` tag on that commit itself.
+3. CI builds, signs, notarizes, installs and smoke-tests on all three systems. It then publishes a GitHub release with the installers, version-less copies of them (so the website's `releases/latest/download/…` links keep working), and `SHA256SUMS`.
 
 If you tag before the credentials are set up, the release is published unsigned and the run shows a warning.
 
