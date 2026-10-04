@@ -97,7 +97,7 @@ Installers for each release are on the [Releases page](https://github.com/ajfan6
 | macOS 11 or later, Apple silicon | `OffsecHub-<version>-macOS-arm64.dmg` | Open it and drag OffsecHub to Applications. |
 | Debian, Ubuntu, Kali and derivatives, x64 | `offsechub_<version>_amd64.deb` | `sudo apt install ./offsechub_<version>_amd64.deb` (pulls in WebKitGTK and PyGObject from your distribution). |
 
-The builds aren't signed with a paid certificate yet, so the first launch needs one confirmation:
+Release builds are signed and notarized once the signing credentials are set up; see [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md). Until then, the first launch needs one confirmation:
 - **Windows SmartScreen:** click *More info*, then *Run anyway*.
 - **macOS:** open *System Settings > Privacy & Security*, then click *Open Anyway*.
 
@@ -170,3 +170,4 @@ docs/                      vault format, threat model, architecture, case study
 - [Threat model](docs/THREAT_MODEL.md): adversaries, controls mapped to tests, out-of-scope items, plaintext artifacts
 - [Architecture](docs/ARCHITECTURE.md): process model, concurrency and persistence, API contract, ADRs
 - [Case study](docs/CASE_STUDY.md): the pivot, design principles, and what adversarial review found
+- [Code signing](docs/CODE_SIGNING.md): signed and notarized releases, and how to set up the credentials

@@ -8,6 +8,9 @@
 ;
 ; Installs per user (no administrator rights) by default; choosing "all users"
 ; installs into Program Files. Uninstalling never touches vaults or settings.
+;
+; Signed builds: iscc /DSign "/Ssigntool=<signtool command> $f" ... signs
+; Setup.exe and the uninstaller (packaging\build.ps1 does this).
 
 #ifndef AppVersion
   #error Pass the version: iscc /DAppVersion=x.y.z offsechub.iss
@@ -48,6 +51,11 @@ WizardStyle=modern
 Compression=lzma2/max
 SolidCompression=yes
 ChangesEnvironment=yes
+#ifdef Sign
+; build.ps1 passes the "signtool" command (/Ssigntool=...) when signing is set up.
+SignTool=signtool
+SignedUninstaller=yes
+#endif
 ; Closes a running OffsecHub through the Restart Manager: the window gets a
 ; normal close, so the vault is saved and locked first.
 CloseApplications=yes

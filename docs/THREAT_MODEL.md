@@ -123,4 +123,4 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 - Signed, timestamped evidence manifests (Ed25519 plus RFC 3161).
 - Locking on OS sleep and session-lock events.
 - Running the unlocked vault in a short-lived child process, so locking returns memory to the OS.
-- Reproducible builds, signed releases and an SBOM.
+- Reproducible builds and an SBOM. Signed and notarized releases are wired into CI and switch on once the signing credentials exist ([CODE_SIGNING.md](CODE_SIGNING.md)).

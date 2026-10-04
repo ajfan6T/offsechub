@@ -47,8 +47,11 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
+  # Every push: unsigned installers, built, installed and smoke-tested on each
+  # OS, plus a rehearsal of the signing pipelines (see docs/CODE_SIGNING.md).
   installers:
     name: installer (${{ matrix.os }})
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     needs: [backend, frontend]
     strategy:
       fail-fast: false
@@ -64,58 +67,93 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
-
-      # Linux: a .deb on the system's WebKitGTK, installed with apt as a user would.
-      - name: Build the .deb
+      - name: Linux .deb
         if: runner.os == 'Linux'
-        run: packaging/linux/build_deb.sh
-      - name: Install with apt, smoke test, uninstall
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb ./dist/offsechub_*_amd64.deb
-          xvfb-run -a python packaging/smoke_test.py --app /usr/bin/offsechub
-          python packaging/smoke_test.py --app /usr/bin/offsechub --browser
-          sudo apt-get remove -y offsechub
-          test ! -e /opt/offsechub
-
-      # macOS: an app bundle in a disk image.
-      - name: Build the .dmg
+        run: packaging/ci/linux.sh
+      - name: macOS .dmg (ad hoc, hardened runtime)
         if: runner.os == 'macOS'
-        run: |
-          pip install -e "./backend[build]"
-          packaging/macos/build_dmg.sh
-      - name: Install from the disk image, smoke test
-        if: runner.os == 'macOS'
-        run: |
-          hdiutil attach dist/OffsecHub-*.dmg -nobrowse -mountpoint "$RUNNER_TEMP/dmg"
-          ditto "$RUNNER_TEMP/dmg/OffsecHub.app" "$RUNNER_TEMP/Applications/OffsecHub.app"
-          hdiutil detach "$RUNNER_TEMP/dmg"
-          python packaging/smoke_test.py --app "$RUNNER_TEMP/Applications/OffsecHub.app/Contents/MacOS/offsechub"
-
-      # Windows: offsechub-setup-<version>.exe (Inno Setup).
-      - name: Build the setup.exe
+        run: packaging/ci/macos.sh
+      - name: Windows setup.exe
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          ./packaging/build.ps1 -SkipFrontend
-      - name: Install silently, smoke test, uninstall
+          ./packaging/ci/windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            dist/offsechub_*_amd64.deb
+            dist/OffsecHub-*.dmg
+            dist/offsechub-setup-*.exe
+      - name: Signing rehearsal (throwaway certificate)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $setup = (Get-ChildItem dist\offsechub-setup-*.exe | Select-Object -First 1).FullName
-          $dir = Join-Path $env:RUNNER_TEMP "OffsecHub"
-          $log = Join-Path $env:RUNNER_TEMP "setup.log"
-          $p = Start-Process $setup -Wait -PassThru -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$dir`"", "/LOG=`"$log`""
-          if ($p.ExitCode -ne 0) { Get-Content $log; throw "setup exited with $($p.ExitCode)" }
-          python packaging/smoke_test.py --app "$dir\offsechub.exe" --cli "$dir\offsechub-cli.exe"
-          if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
-          # The uninstaller relaunches itself from %TEMP%, so wait for the files to go.
-          Start-Process "$dir\unins000.exe" -Wait -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
-          for ($i = 0; ($i -lt 60) -and (Test-Path "$dir\offsechub.exe"); $i++) { Start-Sleep 1 }
-          if (Test-Path "$dir\offsechub.exe") { throw "uninstall left the app behind" }
+        run: ./packaging/ci/windows.ps1 -SigningDryRun
 
+  # A tag like v0.2.0: the same builds, signed and notarized with the credentials
+  # held by the protected "release" environment, then published as a release.
+  # Without credentials they are built unsigned, with a warning.
+  release-installers:
+    name: signed installer (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [backend, frontend]
+    environment: release
+    permissions:
+      contents: read
+      id-token: write  # OpenID Connect to Azure, for Artifact Signing
+    env:
+      HAS_DEVELOPER_ID: ${{ secrets.MACOS_CERTIFICATE != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Linux .deb
+        if: runner.os == 'Linux'
+        run: packaging/ci/linux.sh
+
+      - name: Developer ID certificate and notarization key
+        if: runner.os == 'macOS' && env.HAS_DEVELOPER_ID == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: packaging/macos/import_certificate.sh
+      - name: macOS .dmg (signed, notarized)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: packaging/ci/macos.sh
+
+      - name: Sign in to Azure (OpenID Connect, no stored secret)
+        if: runner.os == 'Windows' && vars.ARTIFACT_SIGNING_ACCOUNT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Windows setup.exe (signed)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          choco install innosetup --no-progress -y
+          ./packaging/ci/windows.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ runner.os }}
@@ -125,10 +163,9 @@ jobs:
             dist/OffsecHub-*.dmg
             dist/offsechub-setup-*.exe
 
-  # Push a tag like v0.2.0 to publish the three installers as a GitHub release.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: installers
+    needs: release-installers
     runs-on: ubuntu-latest
     permissions:
       contents: write
