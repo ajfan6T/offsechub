@@ -128,8 +128,12 @@ def cmd_import(engagement: str, file: Path, tool: str, include_out_of_scope: boo
                                  body=fh, content_type="application/octet-stream", length=size)
     except (NotRunning, LocalApiError) as exc:
         return _fail(str(exc))
-    stats = ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in result["stats"].items())
-    print(f"Imported {file.name} into {status['name']} / {eng['code']}. {stats}")
+    stats = dict(result["stats"])
+    errors = stats.pop("errors", None) or []
+    summary = ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in stats.items())
+    print(f"Imported {file.name} into {status['name']} / {eng['code']}. {summary}")
+    for err in errors:
+        print(f"  warning: {err}", file=sys.stderr)
     return 0
 
 

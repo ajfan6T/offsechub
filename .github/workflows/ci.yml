@@ -68,7 +68,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgirepository-2.0-dev libcairo2-dev \
-            gir1.2-webkit2-4.1 gir1.2-gtk-3.0 xvfb
+            gir1.2-girepository-3.0 gir1.2-webkit2-4.1 gir1.2-gtk-3.0 xvfb
           pip install -e "./backend[gtk]"
       - name: Build
         run: |

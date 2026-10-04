@@ -145,6 +145,7 @@ window.pywebview._createApi = function (funcList) {
     };
   });
 };
+true;
 """
 
 

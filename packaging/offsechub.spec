@@ -25,11 +25,12 @@ datas = [
 ]
 datas += collect_data_files("webview")  # pywebview's injected JS
 
-hiddenimports = collect_submodules("app") + collect_submodules("uvicorn") + [
-    "argon2._ffi", "_cffi_backend",
-]
+hiddenimports = (collect_submodules("app") + collect_submodules("uvicorn") + collect_submodules("argon2")
+                 + ["_argon2_cffi_bindings", "_cffi_backend"])
 if sys.platform.startswith("linux"):
-    hiddenimports += ["webview.platforms.gtk", "gi"]
+    # gi.overrides make GLib.idle_add & co. Pythonic; without them pywebview's GTK
+    # backend fails at runtime. WebKitGTK itself comes from the system.
+    hiddenimports += ["webview.platforms.gtk"] + collect_submodules("gi")
 elif sys.platform == "darwin":
     hiddenimports += ["webview.platforms.cocoa"]
 else:

@@ -101,6 +101,7 @@ Standalone desktop bundles (PyInstaller) for Linux, macOS and Windows are built 
 cd backend && pytest -q                    # vault, local API, domain, desktop shell, fuzzing
 cd frontend && npm run build               # type-check + production build
 offsechub --dev                            # API on :8000; run `npm run dev` in frontend/ and open the printed link
+e2e/run.sh                                 # the real app end to end: Chromium (Playwright) and the native window
 packaging/build.sh                         # standalone bundle for this OS (build.ps1 on Windows)
 ```
 
@@ -114,6 +115,7 @@ backend/app/services/      scope matcher, CVSS, importers, reporting, evidence s
 frontend/                  React 19 + TypeScript + TanStack Query
 packaging/                 PyInstaller spec and build scripts
 tools/                     independent vault decoder
+e2e/                       end-to-end scenarios: browser.cjs (Playwright), native.py (pywebview under Xvfb)
 docs/                      vault format, threat model, architecture, case study
 ```
 
