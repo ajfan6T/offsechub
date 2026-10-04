@@ -2,6 +2,8 @@
 
 **A local-first, encrypted workspace for penetration testers.** Scope, targets, recon imports, testing checklists, evidence, findings, operator logs and client-ready reports, all in **one encrypted vault on your own disk**. No server, no account, no network.
 
+**Website and downloads: [ajfan6t.github.io/offsechub](https://ajfan6t.github.io/offsechub/)**
+
 > A portfolio project in security engineering. The interesting parts are the [vault format](docs/VAULT_FORMAT.md), the [threat model](docs/THREAT_MODEL.md), and the [case study](docs/CASE_STUDY.md) of what adversarial review found in the first design.
 
 ![OffsecHub dashboard: engagements, open findings by severity and the latest findings](docs/screenshots/dashboard.png)
@@ -161,6 +163,7 @@ frontend/                  React 19 + TypeScript + TanStack Query
 packaging/                 installers: PyInstaller spec, Inno Setup (Windows), disk image (macOS), .deb (Linux), smoke test
 tools/                     independent vault decoder
 e2e/                       end-to-end scenarios: browser.cjs (Playwright), native.py (pywebview under Xvfb)
+website/                   the project website (GitHub Pages, .github/workflows/pages.yml)
 docs/                      vault format, threat model, architecture, case study
 ```
 

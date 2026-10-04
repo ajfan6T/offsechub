@@ -178,6 +178,12 @@ jobs:
           pattern: installer-*
           path: dist
           merge-multiple: true
+      - name: Version-less copies, so releases/latest/download/<name> links never change
+        run: |
+          cd dist
+          cp offsechub-setup-*.exe offsechub-setup.exe
+          cp OffsecHub-*-macOS-arm64.dmg OffsecHub-macOS-arm64.dmg
+          cp offsechub_*_amd64.deb offsechub_amd64.deb
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
