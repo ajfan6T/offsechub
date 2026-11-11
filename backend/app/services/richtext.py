@@ -20,7 +20,8 @@ inline
 
 Emphasis is stricter than CommonMark so pentest text stays literal: a marker
 opens only after whitespace, an opening bracket or quote, or the start of the
-text, and only before a letter or digit; it closes only after a non-space and
+text, and a single marker only before a letter or digit (a double one before
+any non-space, so ``**.git**`` is bold); it closes only after a non-space and
 before whitespace, punctuation or the end, but not inside a file name, host or
 path. ``*.example.com``, ``file_names``, ``__init__.py``, ``2*3*4`` and ``a * b``
 are therefore plain text. The frontend preview
@@ -80,7 +81,11 @@ def _is_space(ch: str) -> bool:
 def _can_open(text: str, i: int, size: int) -> bool:
     prev = text[i - 1] if i > 0 else ""
     nxt = text[i + size] if i + size < len(text) else ""
-    return (prev == "" or prev.isspace() or prev in _OPEN_BEFORE) and nxt.isalnum()
+    if not (prev == "" or prev.isspace() or prev in _OPEN_BEFORE):
+        return False
+    # A single marker needs a letter or digit next (so *.example.com stays literal);
+    # a double one only a non-space (so **.git** is bold).
+    return nxt.isalnum() if size == 1 else (nxt != "" and not nxt.isspace() and nxt not in "*_")
 
 
 def _can_close(text: str, i: int, size: int) -> bool:

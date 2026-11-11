@@ -36,7 +36,11 @@ function runLength(text: string, i: number, ch: string): number {
 
 function canOpen(text: string, i: number, size: number): boolean {
   const prev = at(text, i - 1);
-  return (prev === "" || isSpace(prev) || OPEN_BEFORE.has(prev)) && isAlnum(at(text, i + size));
+  if (!(prev === "" || isSpace(prev) || OPEN_BEFORE.has(prev))) return false;
+  // A single marker needs a letter or digit next (so *.example.com stays literal);
+  // a double one only a non-space (so **.git** is bold).
+  const next = at(text, i + size);
+  return size === 1 ? isAlnum(next) : next !== "" && !isSpace(next) && next !== "*" && next !== "_";
 }
 
 function canClose(text: string, i: number, size: number): boolean {

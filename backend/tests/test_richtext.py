@@ -55,6 +55,18 @@ def test_emphasis_after_brackets_and_before_punctuation():
     assert styles("**Critical!**") == [("Critical!", True, False, False, None)]
 
 
+def test_double_markers_open_before_punctuation():
+    assert styles("the **.git** folder and __.env__ file") == [
+        ("the ", False, False, False, None),
+        (".git", True, False, False, None),
+        (" folder and ", False, False, False, None),
+        (".env", True, False, False, None),
+        (" file", False, False, False, None),
+    ]
+    for text in ["src/**/*.js", "**/*.py and **", "a ** b ** c"]:
+        assert styles(text) == [(text, False, False, False, None)], text
+
+
 def test_nested_emphasis():
     assert styles("**bold *both* bold**") == [
         ("bold ", True, False, False, None),
