@@ -6,7 +6,7 @@
 <style>
   :root {
     --critical: #7f1d1d; --high: #dc2626; --medium: #ea580c; --low: #ca8a04; --info: #2563eb;
-    --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --accent: #0f766e;
+    --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --accent: {{ branding.accent }};
   }
   * { box-sizing: border-box; }
   body { font: 11pt/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); margin: 0; background: #f3f4f6; }
@@ -36,7 +36,17 @@
   .meta dt { color: var(--muted); } .meta dd { margin: 0; word-break: break-word; }
   .text { white-space: pre-wrap; word-wrap: break-word; }
   pre, code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9.5pt; }
-  .steps { background: #0b1220; color: #e5e7eb; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+  .steps, .rich pre { background: #0b1220; color: #e5e7eb; padding: 12px 14px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; margin: 8px 0; }
+  .rich { word-wrap: break-word; }
+  .rich p { margin: 0 0 8px; }
+  .rich ul, .rich ol { margin: 4px 0 10px; padding-left: 22px; }
+  .rich li { margin: 2px 0; }
+  .rich :not(pre) > code { background: #f3f4f6; border-radius: 3px; padding: 0 3px; }
+  .rich h4, .rich h5, .rich h6 { font-size: 10.5pt; margin: 12px 0 4px; }
+  .rich a { color: var(--accent); word-break: break-all; }
+  .cover .logo { max-width: 220px; max-height: 90px; margin-bottom: 28px; }
+  .retest-resolved { color: #047857; font-weight: 600; } .retest-partially_resolved { color: #b45309; font-weight: 600; }
+  .retest-not_resolved { color: #b91c1c; font-weight: 600; }
   .evidence img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; margin-top: 8px; }
   .evidence figure { margin: 16px 0; }
   .evidence figcaption { font-size: 9pt; color: var(--muted); }
@@ -56,6 +66,7 @@
 <div class="page">
 
 <section class="cover">
+  {% if branding.logo_data_uri %}<img class="logo" src="{{ branding.logo_data_uri }}" alt="{{ branding.organization }}">{% endif %}
   {% if draft %}<div class="draft-banner">DRAFT - not for distribution</div>{% endif %}
   <div class="kicker">{{ engagement.type }}</div>
   <h1>{{ client.name }}</h1>
@@ -63,10 +74,10 @@
   <p class="muted">
     Reference {{ engagement.code }}<br>
     {% if engagement.start_date %}Testing window {{ engagement.start_date }}{% if engagement.end_date %} to {{ engagement.end_date }}{% endif %}<br>{% endif %}
-    {% if prepared_by.name or prepared_by.organization %}Prepared by {{ [prepared_by.name, prepared_by.organization]|select|join(', ') }}<br>{% endif %}
+    {% if prepared_by.name or branding.organization %}Prepared by {{ [prepared_by.name, branding.organization]|select|join(', ') }}<br>{% endif %}
     Generated {{ generated_at }}
   </p>
-  <p class="muted" style="font-size:9pt">CONFIDENTIAL. This report contains sensitive security information about {{ client.name }}. Distribution is restricted to authorised recipients.</p>
+  {% if branding.classification %}<p class="muted" style="font-size:9pt">{{ branding.classification }}. This report contains sensitive security information about {{ client.name }}. Distribution is restricted to authorised recipients.</p>{% endif %}
 </section>
 
 <h2>Contents</h2>
@@ -84,13 +95,13 @@
 
 <h2 id="summary" class="pb">1. Executive summary</h2>
 {% if engagement.executive_summary %}
-<div class="text">{{ engagement.executive_summary }}</div>
+<div class="rich">{{ engagement.executive_summary|rich }}</div>
 {% else %}
 <p class="muted"><em>No executive summary has been written yet.</em></p>
 {% endif %}
 {% if engagement.description %}
 <h3 style="margin-top:20px">Engagement background</h3>
-<div class="text">{{ engagement.description }}</div>
+<div class="rich">{{ engagement.description|rich }}</div>
 {% endif %}
 
 <h2 id="overview">2. Findings overview</h2>
@@ -105,7 +116,7 @@
 </div>
 {% if findings %}
 <table>
-  <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>CVSS</th><th>Status</th><th>Affected</th></tr></thead>
+  <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>CVSS</th><th>Status</th>{% if retested %}<th>Retest</th>{% endif %}<th>Affected</th></tr></thead>
   <tbody>
   {% for f in findings %}
   <tr>
@@ -114,6 +125,7 @@
     <td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td>
     <td>{{ f.cvss_score if f.cvss_score is not none else '-' }}</td>
     <td>{{ f.status|replace('_', ' ') }}</td>
+    {% if retested %}<td>{% if f.retest_status %}<span class="retest-{{ f.retest_status }}">{{ retest_labels[f.retest_status] }}</span>{% else %}-{% endif %}</td>{% endif %}
     <td>{{ f.targets|length }}</td>
   </tr>
   {% endfor %}
@@ -136,7 +148,7 @@
 {% endif %}
 {% if engagement.rules_of_engagement %}
 <h3>Rules of engagement</h3>
-<div class="text">{{ engagement.rules_of_engagement }}</div>
+<div class="rich">{{ engagement.rules_of_engagement|rich }}</div>
 {% endif %}
 
 <h2 id="methodology">4. Methodology and coverage</h2>
@@ -152,7 +164,7 @@
 {% else %}
 <p class="muted">No methodology checklist was tracked for this engagement.</p>
 {% endif %}
-<p>Severity ratings use the CVSS v3.1 base score where a vector is provided:
+<p>Severity ratings use the CVSS base score (v3.1 or v4.0) where a vector is provided:
 Critical 9.0-10.0, High 7.0-8.9, Medium 4.0-6.9, Low 0.1-3.9, Informational 0.0.</p>
 
 <h2 id="findings" class="pb">5. Detailed findings</h2>
@@ -169,9 +181,9 @@ Critical 9.0-10.0, High 7.0-8.9, Medium 4.0-6.9, Low 0.1-3.9, Informational 0.0.
       {% if f.cwe %}<dt>Weakness</dt><dd>{{ f.cwe }}</dd>{% endif %}
       <dt>Affected assets</dt><dd class="mono">{{ f.targets|join(', ') if f.targets else 'See description' }}</dd>
     </dl>
-    {% if f.description %}<h4>Description</h4><div class="text">{{ f.description }}</div>{% endif %}
-    {% if f.impact %}<h4>Impact</h4><div class="text">{{ f.impact }}</div>{% endif %}
-    {% if f.steps_to_reproduce %}<h4>Steps to reproduce</h4><div class="steps mono">{{ f.steps_to_reproduce }}</div>{% endif %}
+    {% if f.description %}<h4>Description</h4><div class="rich">{{ f.description|rich }}</div>{% endif %}
+    {% if f.impact %}<h4>Impact</h4><div class="rich">{{ f.impact|rich }}</div>{% endif %}
+    {% if f.steps_to_reproduce %}<h4>Steps to reproduce</h4><div class="rich">{{ f.steps_to_reproduce|rich_steps }}</div>{% endif %}
     {% if f.images or f.attachments %}
     <h4>Evidence</h4>
     <div class="evidence">
@@ -185,7 +197,13 @@ Critical 9.0-10.0, High 7.0-8.9, Medium 4.0-6.9, Low 0.1-3.9, Informational 0.0.
       {% endif %}
     </div>
     {% endif %}
-    {% if f.remediation %}<h4>Remediation</h4><div class="text">{{ f.remediation }}</div>{% endif %}
+    {% if f.remediation %}<h4>Remediation</h4><div class="rich">{{ f.remediation|rich }}</div>{% endif %}
+    {% if f.retests %}
+    <h4>Retest history</h4>
+    <table><thead><tr><th>Date</th><th>Result</th><th>Tester</th><th>Notes</th></tr></thead><tbody>
+    {% for r in f.retests %}<tr><td style="white-space:nowrap">{{ r.tested_on }}</td><td><span class="retest-{{ r.result }}">{{ retest_labels[r.result] }}</span></td><td>{{ r.tester }}</td><td class="rich">{{ r.notes|rich }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
     {% if f.references %}
     <h4>References</h4>
     <ul>{% for r in f.references %}<li class="mono" style="word-break:break-all">{{ r }}</li>{% endfor %}</ul>
@@ -241,7 +259,7 @@ added. Recomputing a file's SHA-256 confirms it is the one referenced here.</p>
 </dl>
 {% endif %}
 
-<footer>{{ engagement.code }} · Generated by OffsecHub on {{ generated_at }} · Confidential</footer>
+<footer>{{ engagement.code }} · Generated by OffsecHub on {{ generated_at }}{% if branding.classification %} · {{ branding.classification }}{% endif %}{% if branding.footer %} · {{ branding.footer }}{% endif %}</footer>
 </div>
 </body>
 </html>

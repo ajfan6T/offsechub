@@ -1,10 +1,13 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from ..bootstrap import get_setting
 from ..db import get_db, get_vault
 from ..deps import get_engagement, get_or_404
-from ..models import Engagement, Evidence, Finding, FindingTemplate, Target
+from ..models import Engagement, Evidence, Finding, FindingRetest, FindingTemplate, Target
 from ..schemas import (
     SEVERITY_ORDER,
     CvssIn,
@@ -15,6 +18,8 @@ from ..schemas import (
     FindingTemplateOut,
     FindingTemplateUpdate,
     FindingUpdate,
+    RetestIn,
+    RetestOut,
 )
 from ..services import audit, cvss
 from ..services.findings import apply_cvss, finding_ref, next_finding_number
@@ -27,6 +32,7 @@ def finding_out(f: Finding, evidence_count: int) -> FindingOut:
     out = FindingOut.model_validate(f)
     out.ref = finding_ref(f.engagement, f)
     out.evidence_count = evidence_count
+    out.retest_status = f.retests[-1].result if f.retests else None
     return out
 
 
@@ -60,7 +66,7 @@ def list_findings(severity: str | None = None,
     q = (
         select(Finding)
         .where(Finding.engagement_id == eng.id)
-        .options(selectinload(Finding.targets))
+        .options(selectinload(Finding.targets), selectinload(Finding.retests))
     )
     if severity:
         q = q.where(Finding.severity == severity)
@@ -153,6 +159,47 @@ def delete_finding(finding_id: int, eng: Engagement = Depends(get_engagement),
     db.delete(f)
     audit.record(db, action="delete", entity_type="finding", entity_id=finding_id,
                  engagement_id=eng.id, summary=f"Deleted {ref} {f.title}")
+    db.commit()
+
+
+# ------------------------------------------------------------------- retests
+
+RETEST_LABELS = {"resolved": "resolved", "partially_resolved": "partially resolved",
+                 "not_resolved": "not resolved"}
+
+
+@router.post(prefix + "/{finding_id}/retests", response_model=RetestOut, status_code=201)
+def add_retest(finding_id: int, body: RetestIn, eng: Engagement = Depends(get_engagement),
+               db: Session = Depends(get_db)):
+    """Record a retest. A resolved retest marks a confirmed or reported finding remediated."""
+    f = get_or_404(db, Finding, finding_id, eng.id)
+    tester = body.tester if body.tester is not None else (
+        (get_setting(db, "operator.profile") or {}).get("name") or "")
+    retest = FindingRetest(finding=f, tested_on=body.tested_on or date.today(),
+                           result=body.result, tester=tester.strip(), notes=body.notes)
+    db.add(retest)
+    summary = f"Retested {finding_ref(eng, f)} {f.title}: {RETEST_LABELS[body.result]}"
+    if body.result == "resolved" and f.status in ("confirmed", "reported"):
+        summary += f"; status {f.status} -> remediated"
+        f.status = "remediated"
+    db.flush()
+    audit.record(db, action="update", entity_type="finding", entity_id=f.id,
+                 engagement_id=eng.id, summary=summary)
+    db.commit()
+    return retest
+
+
+@router.delete(prefix + "/{finding_id}/retests/{retest_id}", status_code=204)
+def delete_retest(finding_id: int, retest_id: int, eng: Engagement = Depends(get_engagement),
+                  db: Session = Depends(get_db)):
+    f = get_or_404(db, Finding, finding_id, eng.id)
+    retest = db.get(FindingRetest, retest_id)
+    if retest is None or retest.finding_id != f.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Retest not found")
+    db.delete(retest)
+    audit.record(db, action="update", entity_type="finding", entity_id=f.id,
+                 engagement_id=eng.id,
+                 summary=f"Removed a retest of {finding_ref(eng, f)} ({retest.tested_on})")
     db.commit()
 
 

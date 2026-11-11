@@ -8,7 +8,7 @@ from ..bootstrap import get_setting
 from ..db import get_db, get_vault
 from ..deps import get_engagement
 from ..models import Engagement
-from ..services import audit, reporting, storage
+from ..services import audit, branding, reporting, storage
 from ..vault.manager import OpenVault
 
 router = APIRouter(prefix="/api/engagements/{engagement_id}/report", tags=["reports"])
@@ -27,11 +27,13 @@ def generate_report(
     db: Session = Depends(get_db),
     vault: OpenVault = Depends(get_vault),
 ):
+    profile = get_setting(db, "operator.profile") or {}
     ctx = reporting.build_context(
         eng,
-        profile=get_setting(db, "operator.profile") or {},
+        profile=profile,
         include_drafts=include_drafts,
         read_image=(lambda ev: storage.read_evidence(vault, ev)) if format == "html" else None,
+        branding=branding.report_branding(db, profile),
     )
     audit.record(db, action="export", entity_type="report", engagement_id=eng.id,
                  summary=f"Generated {format} report ({ctx['total_findings']} findings"
@@ -43,7 +45,7 @@ def generate_report(
         headers["Content-Disposition"] = f'attachment; filename="{eng.code}-report.{format}"'
 
     if format == "json":
-        return JSONResponse(ctx, headers=headers)
+        return JSONResponse(reporting.json_safe(ctx), headers=headers)
     if format == "md":
         return Response(reporting.render_markdown(ctx), media_type="text/markdown; charset=utf-8",
                         headers=headers)

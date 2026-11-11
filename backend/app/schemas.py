@@ -30,6 +30,7 @@ Severity = Literal["critical", "high", "medium", "low", "info"]
 FindingStatus = Literal[
     "draft", "confirmed", "reported", "remediated", "risk_accepted", "false_positive"
 ]
+RetestResult = Literal["resolved", "partially_resolved", "not_resolved"]
 OplogOutcome = Literal["info", "success", "failure", "detected"]
 ImportTool = Literal["nmap", "nuclei", "list"]
 
@@ -378,6 +379,23 @@ class FindingUpdate(BaseModel):
     target_ids: list[int] | None = None
 
 
+class RetestIn(BaseModel):
+    tested_on: date | None = None  # defaults to today
+    result: RetestResult
+    # Defaults to the operator profile's name.
+    tester: str | None = Field(default=None, max_length=255)
+    notes: str = ""
+
+
+class RetestOut(ORM):
+    id: int
+    tested_on: date
+    result: RetestResult
+    tester: str
+    notes: str
+    created_at: datetime
+
+
 class FindingOut(ORM):
     id: int
     number: int
@@ -396,6 +414,9 @@ class FindingOut(ORM):
     source: str
     targets: list[TargetBrief]
     evidence_count: int = 0
+    retests: list[RetestOut] = []
+    # The latest retest's result, if the finding has been retested.
+    retest_status: RetestResult | None = None
     created_at: datetime
     updated_at: datetime
 

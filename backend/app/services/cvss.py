@@ -102,3 +102,9 @@ def calculate(vector: str) -> CvssResult:
     if extras:
         canonical += "/" + "/".join(extras)
     return CvssResult(canonical, score, severity_for_score(score), m)
+
+
+def version_of(vector: str | None) -> str:
+    """"3.1", "3.0", "4.0" or "" for a vector's CVSS version (from its prefix)."""
+    prefix = (vector or "").strip().split("/", 1)[0]
+    return prefix[5:] if prefix in ("CVSS:3.0", "CVSS:3.1", "CVSS:4.0") else ""

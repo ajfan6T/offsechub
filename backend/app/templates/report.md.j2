@@ -6,14 +6,18 @@
 Testing window: {{ engagement.start_date }}{{ " to " ~ engagement.end_date if engagement.end_date else "" }}
 
 {% endif %}
-{% if prepared_by.name or prepared_by.organization %}
-Prepared by {{ [prepared_by.name, prepared_by.organization]|select|join(", ") }}
+{% if prepared_by.name or branding.organization %}
+Prepared by {{ [prepared_by.name, branding.organization]|select|join(", ") }}
 
 {% endif %}
 Generated {{ generated_at }}
 {% if draft %}
 
 > **DRAFT** - not for distribution
+{% endif %}
+{% if branding.classification %}
+
+_{{ branding.classification }}_
 {% endif %}
 
 ---
@@ -37,10 +41,10 @@ Generated {{ generated_at }}
 {% endfor %}
 
 {% if findings %}
-| Ref | Title | Severity | CVSS | Status | Affected |
-|---|---|---|---|---|---|
+| Ref | Title | Severity | CVSS | Status |{% if retested %} Retest |{% endif %} Affected |
+|---|---|---|---|---|{% if retested %}---|{% endif %}---|
 {% for f in findings %}
-| {{ f.ref }} | {{ f.title|cell }} | {{ f.severity|capitalize }} | {{ f.cvss_score if f.cvss_score is not none else "-" }} | {{ f.status|replace("_", " ") }} | {{ f.targets|length }} |
+| {{ f.ref }} | {{ f.title|cell }} | {{ f.severity|capitalize }} | {{ f.cvss_score if f.cvss_score is not none else "-" }} | {{ f.status|replace("_", " ") }} |{% if retested %} {{ retest_labels[f.retest_status] if f.retest_status else "-" }} |{% endif %} {{ f.targets|length }} |
 {% endfor %}
 {% endif %}
 
@@ -114,9 +118,7 @@ _No methodology checklist was tracked for this engagement._
 {% if f.steps_to_reproduce %}
 #### Steps to reproduce
 
-```
-{{ f.steps_to_reproduce }}
-```
+{{ f.steps_to_reproduce|steps }}
 
 {% endif %}
 {% if f.images or f.attachments %}
@@ -131,6 +133,16 @@ _No methodology checklist was tracked for this engagement._
 #### Remediation
 
 {{ f.remediation }}
+
+{% endif %}
+{% if f.retests %}
+#### Retest history
+
+| Date | Result | Tester | Notes |
+|---|---|---|---|
+{% for r in f.retests %}
+| {{ r.tested_on }} | {{ retest_labels[r.result] }} | {{ r.tester|cell }} | {{ r.notes|cell }} |
+{% endfor %}
 
 {% endif %}
 {% if f.references %}

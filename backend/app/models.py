@@ -239,6 +239,28 @@ class Finding(TimestampMixin, Base):
         secondary=finding_targets, back_populates="findings", order_by="Target.value"
     )
     evidence: Mapped[list["Evidence"]] = relationship(back_populates="finding")
+    retests: Mapped[list["FindingRetest"]] = relationship(
+        back_populates="finding", cascade="all, delete-orphan",
+        order_by="(FindingRetest.tested_on, FindingRetest.id)",
+    )
+
+
+class FindingRetest(Base):
+    """One retest of a finding: when, by whom, and whether the fix held."""
+
+    __tablename__ = "finding_retests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    finding_id: Mapped[int] = mapped_column(
+        ForeignKey("findings.id", ondelete="CASCADE"), index=True
+    )
+    tested_on: Mapped[date] = mapped_column(Date)
+    result: Mapped[str] = mapped_column(String(20))  # resolved | partially_resolved | not_resolved
+    tester: Mapped[str] = mapped_column(String(255), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    finding: Mapped[Finding] = relationship(back_populates="retests")
 
 
 class FindingTemplate(TimestampMixin, Base):
@@ -283,6 +305,26 @@ class Evidence(Base):
 
     engagement: Mapped[Engagement] = relationship(back_populates="evidence")
     finding: Mapped[Finding | None] = relationship(back_populates="evidence")
+
+
+class ReportAsset(TimestampMixin, Base):
+    """A DOCX report template or the branding logo.
+
+    Small files (see app.services.branding for the limits), so they live in the
+    encrypted database itself rather than the blob store: backups, the vault
+    check and engagement hand-off files need no extra plumbing for them.
+    """
+
+    __tablename__ = "report_assets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)  # template | logo
+    name: Mapped[str] = mapped_column(String(255))
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class OperatorLogEntry(Base):
