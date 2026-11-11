@@ -3,11 +3,13 @@ import { useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { CvssBuilder, useCvssScore } from "../../components/CvssBuilder";
+import { RichField, RichText } from "../../components/RichText";
 import {
   Button,
   Card,
   ConfirmButton,
   DownloadLink,
+  Badge,
   Field,
   Lightbox,
   Loading,
@@ -15,8 +17,8 @@ import {
   SeverityBadge,
   useApiMutation,
 } from "../../components/ui";
-import { FINDING_STATUSES, fmtBytes, fmtDateTime, SEVERITIES, titleCase } from "../../lib/format";
-import type { Evidence, Finding, FindingStatus, Severity } from "../../types";
+import { FINDING_STATUSES, fmtBytes, fmtDate, fmtDateTime, RETEST_RESULTS, SEVERITIES, titleCase } from "../../lib/format";
+import type { Evidence, Finding, FindingStatus, Retest, RetestResult, Severity } from "../../types";
 import { evidenceImages, evidenceUrl, uploadEvidence, useEngagement, useTargets } from "./context";
 
 export function FindingEditor() {
@@ -55,6 +57,7 @@ function Editor({ finding }: { finding: Finding | null }) {
   const [targetSearch, setTargetSearch] = useState("");
   const score = useCvssScore(form.cvss_vector);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+  const setText = (k: keyof typeof form) => (value: string) => setForm((f) => ({ ...f, [k]: value }));
 
   // Severity follows the CVSS score until someone overrides it by hand.
   const effectiveSeverity: Severity = !severityTouched && form.cvss_vector && score.data ? score.data.severity : form.severity;
@@ -132,24 +135,16 @@ function Editor({ finding }: { finding: Finding | null }) {
                 {SEVERITIES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
               </select>
             </Field>
-            <Field label="CVSS v3.1 base" wide>
+            <Field label="CVSS base score" wide hint="CVSS v3.1 or v4.0">
               <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} />
             </Field>
             <Field label="CWE">
               <input className="mono" value={form.cwe} onChange={set("cwe")} placeholder="CWE-79" />
             </Field>
-            <Field label="Description" wide hint="What is wrong and where">
-              <textarea rows={6} value={form.description} onChange={set("description")} />
-            </Field>
-            <Field label="Impact" wide hint="What an attacker can achieve, in business terms">
-              <textarea rows={4} value={form.impact} onChange={set("impact")} />
-            </Field>
-            <Field label="Steps to reproduce" wide>
-              <textarea rows={6} className="mono" value={form.steps_to_reproduce} onChange={set("steps_to_reproduce")} />
-            </Field>
-            <Field label="Remediation" wide>
-              <textarea rows={4} value={form.remediation} onChange={set("remediation")} />
-            </Field>
+            <RichField label="Description" hint="What is wrong and where" rows={6} value={form.description} onChange={setText("description")} />
+            <RichField label="Impact" hint="What an attacker can achieve, in business terms" value={form.impact} onChange={setText("impact")} />
+            <RichField label="Steps to reproduce" hint="Unformatted text is kept as a code block" rows={6} mono value={form.steps_to_reproduce} onChange={setText("steps_to_reproduce")} />
+            <RichField label="Remediation" value={form.remediation} onChange={setText("remediation")} />
             <Field label="References" wide hint="One per line">
               <textarea rows={3} className="mono" value={form.references} onChange={set("references")} />
             </Field>
@@ -174,6 +169,7 @@ function Editor({ finding }: { finding: Finding | null }) {
             </div>
           </Card>
           {finding ? <EvidencePanel finding={finding} /> : <Card title="Evidence"><p className="muted small">Create the finding first, then attach screenshots and request/response pairs.</p></Card>}
+          {finding && <RetestPanel finding={finding} />}
           {finding && (
             <Card title="Record">
               <dl className="dl small">
@@ -254,6 +250,71 @@ function EvidencePanel({ finding }: { finding: Finding }) {
         </div>
       )}
       {preview !== null && <Lightbox images={evidenceImages(base, images)} start={preview} onClose={() => setPreview(null)} />}
+    </Card>
+  );
+}
+
+const RETEST_TONES: Record<RetestResult, string> = { resolved: "green", partially_resolved: "amber", not_resolved: "red" };
+
+export function RetestBadge({ result }: { result: RetestResult }) {
+  return <Badge tone={RETEST_TONES[result]}>{RETEST_RESULTS[result]}</Badge>;
+}
+
+function RetestPanel({ finding }: { finding: Finding }) {
+  const { base } = useEngagement();
+  const today = new Date().toISOString().slice(0, 10);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ tested_on: today, result: "resolved" as RetestResult, notes: "" });
+  const invalidate = [[base, "findings"], [base, "finding", String(finding.id)], [base, "summary"], [base]];
+  const add = useApiMutation(() => api.post<Retest>(`${base}/findings/${finding.id}/retests`, form), {
+    invalidate,
+    success: (r) => `Retest recorded: ${RETEST_RESULTS[r.result].toLowerCase()}`,
+    onSuccess: () => {
+      setAdding(false);
+      setForm({ tested_on: today, result: "resolved", notes: "" });
+    },
+  });
+  const remove = useApiMutation((id: number) => api.del(`${base}/findings/${finding.id}/retests/${id}`), {
+    invalidate,
+    success: "Retest removed",
+  });
+
+  return (
+    <Card title={`Retests (${finding.retests.length})`}>
+      {finding.retests.length === 0 && !adding && <p className="muted small">Not retested yet. Record each retest after the client ships a fix.</p>}
+      <div className="retests">
+        {finding.retests.map((r) => (
+          <div key={r.id} className="retest">
+            <div className="retest-head">
+              <RetestBadge result={r.result} />
+              <span className="small">{fmtDate(r.tested_on)}</span>
+              {r.tester && <span className="muted small">{r.tester}</span>}
+              <ConfirmButton variant="ghost" size="sm" message="Remove this retest?" onConfirm={() => remove.mutate(r.id)}>Remove</ConfirmButton>
+            </div>
+            {r.notes && <RichText text={r.notes} />}
+          </div>
+        ))}
+      </div>
+      {adding ? (
+        <div className="form-grid single">
+          <Field label="Tested on"><input type="date" value={form.tested_on} max={today} onChange={(e) => setForm({ ...form, tested_on: e.target.value })} /></Field>
+          <Field label="Result">
+            <select value={form.result} onChange={(e) => setForm({ ...form, result: e.target.value as RetestResult })}>
+              {Object.entries(RETEST_RESULTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </Field>
+          <RichField label="Notes" rows={3} value={form.notes} onChange={(notes) => setForm({ ...form, notes })} placeholder="What you checked and what you saw" />
+          {form.result === "resolved" && (finding.status === "confirmed" || finding.status === "reported") && (
+            <p className="muted small">The finding will be marked remediated.</p>
+          )}
+          <div className="actions">
+            <Button size="sm" variant="primary" disabled={!form.tested_on} loading={add.isPending} onClick={() => add.mutate(undefined)}>Record retest</Button>
+            <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="actions"><Button size="sm" onClick={() => setAdding(true)}>Record a retest</Button></div>
+      )}
     </Card>
   );
 }

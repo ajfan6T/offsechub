@@ -417,3 +417,26 @@ button.thumb, .thumb-btn { cursor: zoom-in; }
   .no-print { display: none !important; }
   .print-only { display: block; }
 }
+
+/* Rich text (finding fields): same Markdown subset as the reports */
+.rich { line-height: 1.55; word-wrap: break-word; }
+.rich p { margin: 0 0 8px; }
+.rich p:last-child { margin-bottom: 0; }
+.rich ul, .rich ol { margin: 4px 0 8px; padding-left: 22px; }
+.rich li { margin: 2px 0; }
+.rich h5 { font-size: 13px; margin: 10px 0 4px; }
+.rich code { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.rich pre { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 6px 0 10px; white-space: pre-wrap; word-break: break-word; }
+.rich pre code { background: none; border: 0; padding: 0; }
+.rt-link { color: var(--accent); text-decoration: underline dotted; cursor: help; }
+.rich-field .rich-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rich-field .seg button { padding: 2px 9px; font-size: 11px; }
+.rich-preview { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
+
+/* Retests */
+.retests { display: grid; gap: 10px; margin-bottom: 10px; }
+.retest { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.retest-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.retest-head .btn { margin-left: auto; }
+.retest .rich { margin-top: 6px; font-size: 13px; }
+.retest-cell { margin-top: 4px; }

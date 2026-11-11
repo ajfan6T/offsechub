@@ -251,6 +251,17 @@ export interface Evidence {
   is_image: boolean;
 }
 
+export type RetestResult = "resolved" | "partially_resolved" | "not_resolved";
+
+export interface Retest {
+  id: number;
+  tested_on: string;
+  result: RetestResult;
+  tester: string;
+  notes: string;
+  created_at: string;
+}
+
 export interface Finding {
   id: number;
   number: number;
@@ -269,6 +280,8 @@ export interface Finding {
   source: string;
   targets: { id: number; value: string; kind: string }[];
   evidence_count: number;
+  retests: Retest[];
+  retest_status: RetestResult | null;
   created_at: string;
   updated_at: string;
 }

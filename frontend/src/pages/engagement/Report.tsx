@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { api, qs } from "../../api";
-import { Button, Card, DownloadLink, Field, useApiMutation } from "../../components/ui";
+import { RichField } from "../../components/RichText";
+import { Button, Card, DownloadLink, useApiMutation } from "../../components/ui";
 import type { Engagement, TestCase } from "../../types";
 import { useEngagement, useFindings } from "./context";
 
@@ -68,9 +69,7 @@ export function Report() {
           </ul>
         </Card>
         <Card title="Executive summary">
-          <Field label="Written for a non-technical reader: overall risk, key themes, top priorities">
-            <textarea rows={10} value={summary} onChange={(ev) => setSummary(ev.target.value)} />
-          </Field>
+          <RichField label="Summary" hint="For a non-technical reader: overall risk, key themes, top priorities" rows={10} value={summary} onChange={setSummary} />
           <Button variant="primary" disabled={summary === e.executive_summary} loading={saveSummary.isPending} onClick={() => saveSummary.mutate(undefined)}>
             Save summary
           </Button>

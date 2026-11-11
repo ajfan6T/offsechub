@@ -2,6 +2,7 @@ import type {
   EngagementStatus,
   EngagementType,
   FindingStatus,
+  RetestResult,
   ScopeKind,
   Severity,
   TargetKind,
@@ -41,6 +42,12 @@ export const FINDING_STATUSES: Record<FindingStatus, string> = {
   remediated: "Remediated",
   risk_accepted: "Risk accepted",
   false_positive: "False positive",
+};
+
+export const RETEST_RESULTS: Record<RetestResult, string> = {
+  resolved: "Resolved",
+  partially_resolved: "Partially resolved",
+  not_resolved: "Not resolved",
 };
 
 export const TEST_STATUSES: Record<TestStatus, string> = {

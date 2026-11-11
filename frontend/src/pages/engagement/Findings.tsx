@@ -16,6 +16,7 @@ import {
 import { FINDING_STATUSES, SEVERITIES, titleCase } from "../../lib/format";
 import type { Finding, FindingStatus, FindingTemplate, Severity } from "../../types";
 import { useEngagement, useFindings } from "./context";
+import { RetestBadge } from "./FindingEditor";
 
 export function Findings() {
   const { base } = useEngagement();
@@ -105,6 +106,7 @@ export function Findings() {
                     <select value={f.status} onChange={(e) => patch.mutate({ id: f.id, status: e.target.value as FindingStatus })}>
                       {Object.entries(FINDING_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
+                    {f.retest_status && <div className="retest-cell"><RetestBadge result={f.retest_status} /></div>}
                   </td>
                 </tr>
               ))}
