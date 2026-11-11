@@ -1,4 +1,8 @@
-"""CVSS v3.1 base score calculator (FIRST specification, section 7)."""
+"""CVSS score calculator.
+
+v3.0/v3.1 base scores are computed here (FIRST specification, section 7); CVSS:4.0
+vectors are handed to ``cvss4``. Both versions share the qualitative severity scale.
+"""
 
 import math
 from dataclasses import dataclass
@@ -20,6 +24,7 @@ BASE_METRICS = ("AV", "AC", "PR", "UI", "S", "C", "I", "A")
 OPTIONAL_METRICS = {
     "E", "RL", "RC", "CR", "IR", "AR", "MAV", "MAC", "MPR", "MUI", "MS", "MC", "MI", "MA",
 }
+VERSIONS = {"CVSS:3.0": "3.0", "CVSS:3.1": "3.1", "CVSS:4.0": "4.0"}
 
 
 class CvssError(ValueError):
@@ -54,6 +59,11 @@ def severity_for_score(score: float) -> str:
     return "critical"
 
 
+def version_of(vector: str | None) -> str:
+    """CVSS version named by a vector's prefix ("3.0", "3.1" or "4.0"), or "" if none."""
+    return VERSIONS.get((vector or "").strip().split("/", 1)[0], "")
+
+
 def parse_vector(vector: str) -> dict[str, str]:
     parts = vector.strip().split("/")
     if not parts or parts[0] not in ("CVSS:3.1", "CVSS:3.0"):
@@ -78,6 +88,14 @@ def parse_vector(vector: str) -> dict[str, str]:
 
 
 def calculate(vector: str) -> CvssResult:
+    version = version_of(vector)
+    if not version:
+        raise CvssError("vector must start with CVSS:3.1/, CVSS:3.0/ or CVSS:4.0/")
+    if version == "4.0":
+        from . import cvss4  # imported here because cvss4 builds on this module's types
+
+        return cvss4.calculate(vector)
+
     m = parse_vector(vector)
     changed = m["S"] == "C"
     pr = (PR_SCOPE_CHANGED if changed else WEIGHTS["PR"])[m["PR"]]
@@ -102,9 +120,3 @@ def calculate(vector: str) -> CvssResult:
     if extras:
         canonical += "/" + "/".join(extras)
     return CvssResult(canonical, score, severity_for_score(score), m)
-
-
-def version_of(vector: str | None) -> str:
-    """"3.1", "3.0", "4.0" or "" for a vector's CVSS version (from its prefix)."""
-    prefix = (vector or "").strip().split("/", 1)[0]
-    return prefix[5:] if prefix in ("CVSS:3.0", "CVSS:3.1", "CVSS:4.0") else ""

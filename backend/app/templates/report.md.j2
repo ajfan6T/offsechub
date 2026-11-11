@@ -96,7 +96,7 @@ _No methodology checklist was tracked for this engagement._
 | Severity | **{{ f.severity|capitalize }}** |
 | Status | {{ f.status|replace("_", " ") }} |
 {% if f.cvss_vector %}
-| CVSS v3.1 | {{ f.cvss_score }} (`{{ f.cvss_vector }}`) |
+| {{ f.cvss_vector.split('/')[0].replace('CVSS:', 'CVSS v') }} | {{ f.cvss_score }} (`{{ f.cvss_vector }}`) |
 {% endif %}
 {% if f.cwe %}
 | Weakness | {{ f.cwe }} |

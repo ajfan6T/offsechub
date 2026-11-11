@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from defusedxml import ElementTree as SafeET
 
+from .. import cvss as cvss_scoring
 from ..scope import parse_identifier
 
 
@@ -173,6 +174,15 @@ def _nuclei_host(record: dict) -> ParsedHost:
     return ParsedHost(value=host or ip, ip=ip)
 
 
+def _scorable_cvss(vector: str) -> str:
+    """The vector if it is one we can score (CVSS 3.0, 3.1 or 4.0), else ""."""
+    try:
+        cvss_scoring.calculate(vector)
+    except cvss_scoring.CvssError:
+        return ""
+    return vector.strip()
+
+
 def parse_nuclei(data: bytes) -> ParseResult:
     text = data.decode("utf-8", errors="replace").strip()
     records: list = []
@@ -232,7 +242,7 @@ def parse_nuclei(data: bytes) -> ParseResult:
                 remediation=str(info.get("remediation") or "").strip(),
                 references=refs,
                 cwe=cwe,
-                cvss_vector=cvss if cvss.startswith("CVSS:3") else "",
+                cvss_vector=_scorable_cvss(cvss),
                 reproduction="\n".join(repro),
             )
         )
