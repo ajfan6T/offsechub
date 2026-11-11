@@ -381,7 +381,7 @@ body.is-locked .scrambled { color: var(--muted); }
           <span>Download OffsecHub</span>
         </a>
         <a class="btn btn-ghost" href="https://github.com/ajfan6T/offsechub">Source on GitHub</a>
-        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+ (Apple silicon), Debian/Ubuntu/Kali</span>
+        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+ (Apple silicon), Debian 12+, Ubuntu 24.04+, Kali</span>
       </div>
     </div>
   </div>
@@ -632,7 +632,7 @@ Remediation: block /.git/ at the web server.</textarea>
       <span class="perm" aria-hidden="true">-rw-r--r--</span>
       <span class="size">≈ 29 MB</span>
       <span class="name">offsechub_amd64.deb<small class="digest"></small></span>
-      <span class="plat">Linux <span class="yours chip">your system</span><span class="plat-sub">Debian, Ubuntu, Kali and derivatives, 64-bit</span></span>
+      <span class="plat">Linux <span class="yours chip">your system</span><span class="plat-sub">Debian 12+, Ubuntu 24.04+, Kali, 64-bit</span></span>
       <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/offsechub_amd64.deb">Download .deb</a>
     </div>
   </div>
@@ -662,6 +662,7 @@ Remediation: block /.git/ at the web server.</textarea>
       </ol>
       <div class="code"><span class="prompt">$ </span>sudo apt install ./offsechub_amd64.deb<button class="copy" type="button" data-copy="sudo apt install ./offsechub_amd64.deb">Copy</button></div>
       <p class="note">Then start OffsecHub from your app menu, or run <code>offsechub</code>.</p>
+      <p class="note">Needs Debian 12, Ubuntu 24.04 or current Kali, or newer. Older releases such as Ubuntu 22.04 ship a Python that is too old for the package: <a href="https://github.com/ajfan6T/offsechub#run-from-source">run from source</a> with Python 3.11 or later instead.</p>
     </article>
   </div>
 
@@ -877,7 +878,7 @@ Remediation: block /.git/ at the web server.</textarea>
       tag.innerHTML = `Latest: <b></b>${date ? ` · ${date}` : ""}`;
       tag.querySelector("b").textContent = release.tag_name;
       meta.replaceChild(tag, meta.firstElementChild);
-      $("#hero-note").textContent = `Free · ${release.tag_name} · Windows, macOS (Apple silicon), Debian/Ubuntu/Kali`;
+      $("#hero-note").textContent = `Free · ${release.tag_name} · Windows, macOS (Apple silicon), Debian 12+, Ubuntu 24.04+, Kali`;
       for (const row of $$(".asset")) {
         const asset = (release.assets || []).find((a) => a.name === row.dataset.asset);
         if (!asset) continue;
