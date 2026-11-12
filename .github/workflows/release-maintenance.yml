@@ -1,0 +1,40 @@
+name: Release maintenance
+
+# Actions > Release maintenance > Run workflow: delete assets that should not be
+# on a published release (for example files uploaded to it by mistake).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (for example v0.2.0)
+        required: true
+      assets:
+        description: Asset file names to delete, separated by spaces
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  delete-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the named assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Inputs go through the environment, never into the script text.
+          TAG: ${{ inputs.tag }}
+          ASSETS: ${{ inputs.assets }}
+        run: |
+          set -euo pipefail
+          existing=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          for name in $ASSETS; do
+            if grep -qxF -- "$name" <<<"$existing"; then
+              gh release delete-asset "$TAG" "$name" --repo "$GITHUB_REPOSITORY" --yes
+              echo "Deleted $name from $TAG"
+            else
+              echo "::warning::$name is not an asset of $TAG"
+            fi
+          done
+          echo "Assets of $TAG now:"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

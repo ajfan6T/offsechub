@@ -163,3 +163,16 @@ def test_logo_must_be_an_image(api):
     r = api.post("/api/report-branding/logo", content=b"<svg></svg>", headers={"Content-Type": "image/svg+xml"})
     assert r.status_code == 422
     assert api.put("/api/report-branding", json={"accent": "red"}).status_code == 422
+
+
+def test_pdf_report_through_the_api(api, report_setup):
+    from pypdf import PdfReader
+
+    r = api.get(f"{report_setup}/report?format=pdf&download=1")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.headers["content-disposition"].startswith("attachment;")
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(r.content)).pages)
+    assert "Exposed Git repository <b>" in text
+    assert "<script>alert(1)</script>" in text
+    assert "Not resolved" in text and "CVSS v3.1" in text
