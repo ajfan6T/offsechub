@@ -91,7 +91,7 @@ The hardened runtime makes two exceptions for the embedded Python, listed in [`e
 2. Start the release in one of two ways:
    - Tag and push: `git tag v0.2.1 && git push origin v0.2.1`. The tag must match the version.
    - Or, without pushing a tag: *Actions → CI → Run workflow*, tick **Publish a release**. CI creates the `v<version>` tag on that commit itself.
-3. CI builds, signs, notarizes, installs and smoke-tests on all three systems. It then publishes a GitHub release with the installers, version-less copies of them (so the website's `releases/latest/download/…` links keep working), and `SHA256SUMS`.
+3. CI builds, signs, notarizes, installs and smoke-tests on all three systems, five installers in all: Windows x64, macOS for Apple silicon and for Intel (each signed and notarized with the same Developer ID), and Linux x64 and arm64. It then publishes a GitHub release with the installers, version-less copies of them (so the website's `releases/latest/download/…` links keep working), and `SHA256SUMS`.
 
 If you tag before the credentials are set up, the release is published unsigned and the run shows a warning.
 

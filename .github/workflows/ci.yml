@@ -56,7 +56,8 @@ jobs:
           path: frontend/dist
 
   # Every push: unsigned installers, built, installed and smoke-tested on each
-  # OS, plus a rehearsal of the signing pipelines (see docs/CODE_SIGNING.md).
+  # OS and architecture, plus a rehearsal of the signing pipelines (see
+  # docs/CODE_SIGNING.md).
   installers:
     name: installer (${{ matrix.os }})
     if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.release }}
@@ -64,7 +65,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        # x64 and arm64 Linux, Apple silicon and Intel Macs, x64 Windows. The
+        # first leg of each OS keeps the artifact name it always had.
+        include:
+          - os: ubuntu-24.04
+            artifact: installer-Linux
+          - os: ubuntu-24.04-arm
+            artifact: installer-Linux-arm64
+          - os: macos-14
+            artifact: installer-macOS
+          - os: macos-15-intel
+            artifact: installer-macOS-x86_64
+          - os: windows-2022
+            artifact: installer-Windows
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -89,10 +102,10 @@ jobs:
           ./packaging/ci/windows.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ runner.os }}
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            dist/offsechub_*_amd64.deb
+            dist/offsechub_*.deb
             dist/OffsecHub-*.dmg
             dist/offsechub-setup-*.exe
       - name: Signing rehearsal (throwaway certificate)
@@ -116,7 +129,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        # x64 and arm64 Linux, Apple silicon and Intel Macs, x64 Windows. The
+        # first leg of each OS keeps the artifact name it always had.
+        include:
+          - os: ubuntu-24.04
+            artifact: installer-Linux
+          - os: ubuntu-24.04-arm
+            artifact: installer-Linux-arm64
+          - os: macos-14
+            artifact: installer-macOS
+          - os: macos-15-intel
+            artifact: installer-macOS-x86_64
+          - os: windows-2022
+            artifact: installer-Windows
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -164,10 +189,10 @@ jobs:
           ./packaging/ci/windows.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ runner.os }}
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            dist/offsechub_*_amd64.deb
+            dist/offsechub_*.deb
             dist/OffsecHub-*.dmg
             dist/offsechub-setup-*.exe
 
@@ -194,9 +219,12 @@ jobs:
       - name: Version-less copies, so releases/latest/download/<name> links never change
         run: |
           cd dist
-          cp offsechub-setup-*.exe offsechub-setup.exe
-          cp OffsecHub-*-macOS-arm64.dmg OffsecHub-macOS-arm64.dmg
-          cp offsechub_*_amd64.deb offsechub_amd64.deb
+          # Fails if any platform's installer is missing.
+          cp "offsechub-setup-$VERSION.exe" offsechub-setup.exe
+          cp "OffsecHub-$VERSION-macOS-arm64.dmg" OffsecHub-macOS-arm64.dmg
+          cp "OffsecHub-$VERSION-macOS-x86_64.dmg" OffsecHub-macOS-x86_64.dmg
+          cp "offsechub_${VERSION}_amd64.deb" offsechub_amd64.deb
+          cp "offsechub_${VERSION}_arm64.deb" offsechub_arm64.deb
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@v2

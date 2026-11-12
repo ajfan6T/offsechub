@@ -9,7 +9,11 @@ cd "$(dirname "$0")/../.."
 if [[ -z "${MACOS_SIGN_IDENTITY:-}" ]]; then
   echo "::warning::No Developer ID configured: building an ad-hoc signed disk image"
 fi
-python -m pip install -e "./backend[build]"
+# --prefer-binary: the newest release with a wheel for this Mac, rather than a
+# newer source release compiled here. Some dependencies have stopped publishing
+# Intel wheels (cryptography 49+, argon2-cffi-bindings 26): built on the runner
+# they need Rust and OpenSSL, and would only run on the runner's macOS or later.
+python -m pip install --prefer-binary -e "./backend[build]"
 packaging/macos/build_dmg.sh
 
 TMP="${RUNNER_TEMP:-$(mktemp -d)}"

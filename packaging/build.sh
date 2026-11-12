@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the installer for this OS into dist/:
-#   Linux  offsechub_<version>_amd64.deb         (packaging/linux/build_deb.sh)
+#   Linux  offsechub_<version>_<arch>.deb        (packaging/linux/build_deb.sh)
 #   macOS  OffsecHub-<version>-macOS-<arch>.dmg  (packaging/macos/build_dmg.sh)
+# for this machine's architecture: amd64/x86_64 or arm64.
 # On Windows, run packaging\build.ps1 instead.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -13,7 +14,8 @@ case "$(uname)" in
     packaging/linux/build_deb.sh
     ;;
   Darwin)
-    "$PYTHON" -m pip install -e "./backend[build]"
+    # --prefer-binary: see packaging/ci/macos.sh.
+    "$PYTHON" -m pip install --prefer-binary -e "./backend[build]"
     packaging/macos/build_dmg.sh
     ;;
   *)

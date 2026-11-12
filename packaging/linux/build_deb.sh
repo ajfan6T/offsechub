@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Build dist/offsechub_<version>_amd64.deb for Debian, Ubuntu, Kali and their
-# derivatives.
+# Build dist/offsechub_<version>_<arch>.deb for Debian, Ubuntu, Kali and their
+# derivatives, where <arch> is amd64 or arm64.
 #
 #   packaging/linux/build_deb.sh            (after `npm run build` in frontend/)
+#                                           for this machine's architecture
+#   DEB_HOST_ARCH=arm64 packaging/linux/build_deb.sh
+#                                           for another one: nothing is compiled,
+#                                           so any machine can build either
 #
 # Why not a PyInstaller bundle: WebKitGTK starts helper processes from the
 # system and they must be the exact version of the library that loads them,
@@ -10,6 +14,8 @@
 # distribution's WebKitGTK and python3-gi, and only the pure-Python and wheel
 # dependencies travel inside it: one set of wheels per CPython 3.11-3.14,
 # installed offline into /opt/offsechub/venv when the package is configured.
+# Binary wheels (cryptography, lxml, Pillow, pydantic-core...) are the manylinux
+# ones for the package's architecture.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -19,8 +25,21 @@ PYVERSIONS="${PYVERSIONS:-3.11 3.12 3.13 3.14}"
 MAINTAINER="${MAINTAINER:-OffsecHub <ajfan6T@users.noreply.github.com>}"
 [[ -f frontend/dist/index.html ]] || { echo "Build the frontend first: cd frontend && npm ci && npm run build" >&2; exit 1; }
 
+ARCH="${DEB_HOST_ARCH:-$(dpkg --print-architecture)}"
+case "$ARCH" in
+  amd64) WHEEL_ARCH=x86_64 ;;
+  arm64) WHEEL_ARCH=aarch64 ;;
+  *) echo "Unsupported architecture: $ARCH (amd64 or arm64)" >&2; exit 1 ;;
+esac
+# manylinux wheels that run on glibc 2.17 to 2.36: Debian 12, the oldest supported
+# release, has 2.36 (Ubuntu 24.04 2.39, Kali newer).
+PLATFORMS=(--platform "manylinux2014_$WHEEL_ARCH")
+for glibc_minor in $(seq 17 36); do
+  PLATFORMS+=(--platform "manylinux_2_${glibc_minor}_$WHEEL_ARCH")
+done
+
 BUILD="$ROOT/build/deb"
-STAGE="$BUILD/offsechub_${VERSION}_amd64"
+STAGE="$BUILD/offsechub_${VERSION}_$ARCH"
 OPT="$STAGE/opt/offsechub"
 rm -rf "$BUILD"
 mkdir -p "$OPT/backend" "$OPT/frontend" "$OPT/wheels" "$STAGE/DEBIAN" "$STAGE/usr/bin" \
@@ -39,13 +58,13 @@ EOF
 
 # Pure-Python dependencies published only as source (e.g. proxy_tools) become
 # wheels here; everything else is downloaded as a binary wheel per Python version.
+# Only the pure wheels are kept from this step, so the host's architecture doesn't
+# matter.
 "$PYTHON" -m pip wheel --quiet --disable-pip-version-check -r "$OPT/requirements.txt" -w "$BUILD/host-wheels"
 cp "$BUILD"/host-wheels/*-none-any.whl "$OPT/wheels/"
 for v in $PYVERSIONS; do
   "$PYTHON" -m pip download --quiet --disable-pip-version-check --only-binary=:all: \
-    --implementation cp --python-version "$v" \
-    --platform manylinux2014_x86_64 --platform manylinux_2_17_x86_64 \
-    --platform manylinux_2_28_x86_64 --platform manylinux_2_34_x86_64 \
+    --implementation cp --python-version "$v" "${PLATFORMS[@]}" \
     --find-links "$OPT/wheels" -d "$OPT/wheels" -r "$OPT/requirements.txt"
 done
 
@@ -124,7 +143,7 @@ Package: offsechub
 Version: $VERSION
 Section: utils
 Priority: optional
-Architecture: amd64
+Architecture: $ARCH
 Installed-Size: $INSTALLED_KB
 Depends: python3 (>= 3.11), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1
 Recommends: xdg-utils
@@ -140,6 +159,6 @@ chmod 0755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/prerm"
 find "$STAGE" -path "$STAGE/DEBIAN" -prune -o -type d -exec chmod 0755 {} +
 find "$STAGE/opt" "$STAGE/usr/share" -type f -exec chmod 0644 {} +
 mkdir -p dist
-OUT="dist/offsechub_${VERSION}_amd64.deb"
+OUT="dist/offsechub_${VERSION}_$ARCH.deb"
 dpkg-deb --root-owner-group -Zxz --build "$STAGE" "$OUT"
 echo "Built $OUT ($(du -h "$OUT" | cut -f1))"
