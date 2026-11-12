@@ -2,6 +2,7 @@
 
 import html
 import re
+import time
 
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
@@ -198,3 +199,63 @@ def test_no_text_is_lost_outside_markers(text):
 
 def test_span_defaults():
     assert Span("x").href is None and not Span("x").is_break
+
+
+# Parse time. Finding text can quote whatever a target sent back (nuclei extracted-results
+# lands in finding fields unescaped), so no input may make parsing slower than linear and
+# stall a report. Each input below once took from seconds to hours; now well under a second.
+
+
+def parses_quickly(text, limit=2.0):
+    start = time.perf_counter()
+    blocks = parse(text)
+    elapsed = time.perf_counter() - start
+    assert elapsed < limit, f"{elapsed:.1f} s to parse {len(text):,} characters"
+    return blocks
+
+
+def test_openers_without_closers_parse_in_linear_time():
+    # Each opener used to scan the rest of the text for a closer.
+    for text in ["*a " * 70_000, "**a __b *c _d " * 15_000]:
+        assert is_plain(parses_quickly(text))
+
+
+def test_unmatched_backtick_runs_parse_in_linear_time():
+    # Each run (and each position in it, for a closer scan) used to search the rest of the
+    # text for a run of its length.
+    assert is_plain(parses_quickly("*a " + "".join("`" * k + " x " for k in range(1, 600))))
+
+
+def test_link_search_is_linear():
+    # Each "[" used to search for "](" and then read the label and the URL.
+    assert is_plain(parses_quickly("[" * 100_000 + "](http://" + "a" * 100_000))
+    [block] = parses_quickly("[a" * 50_000 + "](http://" + "a" * 100_000 + ")")
+    assert block.spans[-1] == Span("a", href="http://" + "a" * 100_000)
+
+
+def test_deeply_nested_emphasis_parses_in_linear_time():
+    # Nesting is not limited to the four kinds of marker: each closer scan here steps into a
+    # backtick run and skips the inner closers as code, so this nests 500 deep.
+    text = "x"
+    for k in range(500, 0, -1):
+        text = f"*a {'`' * (2 * k + 1)} {text} {'`' * (2 * k)} b*"
+    [block] = parses_quickly(text)
+    assert all(s.italic and not s.code for s in block.spans)
+
+
+def test_long_heading_and_fence_lines_parse_in_linear_time():
+    # The heading pattern backtracked in cubic time over a run of spaces, the fence one in quadratic.
+    assert [b.kind for b in parses_quickly("# a" + " " * 200_000 + "b")] == ["heading"]
+    assert [b.kind for b in parses_quickly("```" + " " * 200_000 + "!")] == ["paragraph"]
+
+
+def test_many_list_paragraphs_parse_in_linear_time():
+    # Each indented paragraph used to copy the whole item so far.
+    [block] = parses_quickly("- a" + "\n\n  b" * 40_000)
+    assert block.kind == "bullets" and len(block.items[0]) == 1 + 3 * 40_000
+
+
+def test_many_spans_of_one_style_join_in_linear_time():
+    # Joining neighbouring spans of one style used to copy the joined text again for each span.
+    [block] = parses_quickly("*a " + "(_b_)" * 100_000 + " c*")
+    assert block.spans == [Span("a " + "(b)" * 100_000 + " c", italic=True)]
