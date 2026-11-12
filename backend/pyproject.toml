@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27", "hypothesis>=6.100"]
+dev = ["pytest>=8", "httpx>=0.27", "hypothesis>=6.100", "pypdf>=4"]
 # Linux desktop window: WebKitGTK via PyGObject (needs the system's gir1.2-webkit2-4.1).
 gtk = ["PyGObject>=3.42"]
 build = ["pyinstaller>=6.6"]
