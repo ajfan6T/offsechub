@@ -1,0 +1,315 @@
+<?xml version="1.0" ?>
+<NessusClientData_v2>
+<Policy><policyName>ACME external - basic network scan</policyName>
+<Preferences><ServerPreferences>
+<preference><name>TARGET</name><value>203.0.113.0/28,198.51.100.7</value></preference>
+<preference><name>port_range</name><value>default</value></preference>
+</ServerPreferences></Preferences>
+</Policy>
+<Report name="ACME-EXT-26 external infrastructure" xmlns:cm="http://www.nessus.org/cm">
+<ReportHost name="203.0.113.10"><HostProperties>
+<tag name="HOST_END_TIMESTAMP">1790265711</tag>
+<tag name="HOST_END">Sun Sep 20 16:01:51 2026</tag>
+<tag name="operating-system">Linux Kernel 5.4 on Ubuntu 20.04</tag>
+<tag name="os">linux</tag>
+<tag name="system-type">general-purpose</tag>
+<tag name="host-rdns">www.acme-corp.example</tag>
+<tag name="host-fqdn">www.acme-corp.example</tag>
+<tag name="host-ip">203.0.113.10</tag>
+<tag name="HOST_START_TIMESTAMP">1790264530</tag>
+<tag name="HOST_START">Sun Sep 20 15:42:10 2026</tag>
+</HostProperties>
+<ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings">
+<description>This plugin reports information about the scan itself: the Nessus version, plugin feed, scan policy, port range and whether credentials were used.</description>
+<fname>scan_info.nasl</fname>
+<plugin_name>Nessus Scan Information</plugin_name>
+<plugin_type>summary</plugin_type>
+<risk_factor>None</risk_factor>
+<solution>n/a</solution>
+<synopsis>This plugin displays information about the Nessus scan.</synopsis>
+<plugin_output>Information about this scan :
+
+Nessus version : 10.8.3
+Plugin feed version : 202609200512
+Scan type : Normal
+Scan name : ACME-EXT-26 external infrastructure
+Scan policy used : Basic Network Scan
+Scanner IP : 192.0.2.200
+Port scanner(s) : nessus_syn_scanner
+Port range : default
+Credentialed checks : no
+Scan Start Date : 2026/9/20 15:42 UTC
+</plugin_output>
+</ReportItem>
+<ReportItem port="22" svc_name="ssh" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 22/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="80" svc_name="www" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 80/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 443/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="22" svc_name="ssh" protocol="tcp" severity="0" pluginID="10267" pluginName="SSH Server Type and Version Information" pluginFamily="Service detection">
+<description>It is possible to obtain information about the remote SSH server by sending an empty authentication request.</description>
+<plugin_name>SSH Server Type and Version Information</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>n/a</solution>
+<synopsis>An SSH server is listening on this port.</synopsis>
+<plugin_output>
+SSH version : SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5
+SSH supported authentication : publickey,password
+</plugin_output>
+</ReportItem>
+<ReportItem port="22" svc_name="ssh" protocol="tcp" severity="2" pluginID="187315" pluginName="SSH Terrapin Prefix Truncation Weakness (CVE-2023-48795)" pluginFamily="Misc.">
+<cvss3_base_score>5.9</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N</cvss3_vector>
+<cvss4_base_score>5.3</cvss4_base_score>
+<cvss4_vector>CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N</cvss4_vector>
+<cvss_base_score>5.4</cvss_base_score>
+<cvss_vector>CVSS2#AV:N/AC:H/Au:N/C:N/I:C/A:N</cvss_vector>
+<cve>CVE-2023-48795</cve>
+<description>The remote SSH server is vulnerable to a man-in-the-middle prefix truncation weakness known as Terrapin. An attacker on the network path can drop messages at the start of the secure channel without either side noticing, which can downgrade the security of the connection, for example by disabling keystroke timing obfuscation.
+
+The weakness affects the chacha20-poly1305@openssh.com cipher and the encrypt-then-MAC (-etm@openssh.com) MAC algorithms when strict key exchange is not supported by both sides.
+
+Note that Nessus has not tested for this issue but has instead relied only on the algorithms the server advertises.</description>
+<plugin_name>SSH Terrapin Prefix Truncation Weakness (CVE-2023-48795)</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://terrapin-attack.com/
+https://nvd.nist.gov/vuln/detail/CVE-2023-48795</see_also>
+<solution>Upgrade the SSH server to a release that supports strict key exchange (OpenSSH 9.6 or later), or disable the affected cipher and MAC algorithms.</solution>
+<synopsis>The remote SSH server is vulnerable to a man-in-the-middle prefix truncation attack.</synopsis>
+<plugin_output>
+Supports following ChaCha20-Poly1305 Client to Server algorithm : chacha20-poly1305@openssh.com
+Supports following ChaCha20-Poly1305 Server to Client algorithm : chacha20-poly1305@openssh.com
+Supports following Encrypt-then-MAC Client to Server algorithms : umac-64-etm@openssh.com, umac-128-etm@openssh.com, hmac-sha2-256-etm@openssh.com
+Supports following Encrypt-then-MAC Server to Client algorithms : umac-64-etm@openssh.com, umac-128-etm@openssh.com, hmac-sha2-256-etm@openssh.com
+</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="0" pluginID="22964" pluginName="Service Detection" pluginFamily="Service detection">
+<description>Nessus was able to identify the remote service by its banner or by looking at the error message it sends when it receives an HTTP request.</description>
+<plugin_name>Service Detection</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>n/a</solution>
+<synopsis>The remote service could be identified.</synopsis>
+<plugin_output>A TLSv1 server answered on this port.
+
+A web server is running on this port through TLSv1.</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="104743" pluginName="TLS Version 1.0 Protocol Detection" pluginFamily="Service detection">
+<cvss3_base_score>6.5</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N</cvss3_vector>
+<cvss_base_score>6.1</cvss_base_score>
+<cvss_vector>CVSS2#AV:N/AC:H/Au:N/C:C/I:P/A:N</cvss_vector>
+<description>The remote service accepts connections encrypted using TLS 1.0. TLS 1.0 has several cryptographic design flaws, and PCI DSS has required it to be disabled since June 2018. Modern clients support TLS 1.2 and 1.3.</description>
+<plugin_name>TLS Version 1.0 Protocol Detection</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://datatracker.ietf.org/doc/html/rfc8996</see_also>
+<solution>Enable support for TLS 1.2 and 1.3, and disable support for TLS 1.0.</solution>
+<synopsis>The remote service encrypts traffic using an older version of TLS.</synopsis>
+<xref>CWE:327</xref>
+<plugin_output>TLSv1 is enabled and the server supports at least one cipher.</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="142960" pluginName="HSTS Missing From HTTPS Server (RFC 6797)" pluginFamily="Web Servers">
+<cvss3_base_score>6.5</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N</cvss3_vector>
+<description>The remote web server does not send the Strict-Transport-Security header defined by RFC 6797. Without it, browsers may contact the site over plain HTTP, which allows downgrade and SSL-stripping attacks by anyone on the network path and weakens protection against cookie hijacking.</description>
+<plugin_name>HSTS Missing From HTTPS Server (RFC 6797)</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://datatracker.ietf.org/doc/html/rfc6797</see_also>
+<solution>Configure the remote web server to use HSTS.</solution>
+<synopsis>The remote web server is not enforcing HSTS, as defined by RFC 6797.</synopsis>
+<plugin_output>
+  HTTP/1.1 200 OK
+  Server: nginx/1.18.0
+  Content-Type: text/html; charset=utf-8
+  Connection: close
+
+The remote HTTPS server does not send the HTTP
+"Strict-Transport-Security" header.
+</plugin_output>
+</ReportItem>
+</ReportHost>
+<ReportHost name="203.0.113.12"><HostProperties>
+<tag name="HOST_END">Sun Sep 20 16:09:12 2026</tag>
+<tag name="operating-system">Microsoft Windows Server 2019 Standard</tag>
+<tag name="os">windows</tag>
+<tag name="netbios-name">MAIL01</tag>
+<tag name="hostname">MAIL01</tag>
+<tag name="host-fqdn">mail.acme-corp.example</tag>
+<tag name="host-ip">203.0.113.12</tag>
+<tag name="HOST_START">Sun Sep 20 15:42:11 2026</tag>
+</HostProperties>
+<ReportItem port="25" svc_name="smtp" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 25/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="3389" svc_name="msrdp" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 3389/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="25" svc_name="smtp" protocol="tcp" severity="0" pluginID="10263" pluginName="SMTP Server Detection" pluginFamily="Service detection">
+<description>The remote host is running a mail (SMTP) server on this port. Mail servers should be reachable from the internet only where they are meant to receive mail.</description>
+<plugin_name>SMTP Server Detection</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Disable this service if you do not use it, or filter incoming traffic to this port.</solution>
+<synopsis>An SMTP server is listening on the remote port.</synopsis>
+<plugin_output>Remote SMTP server banner :
+
+220 mail.acme-corp.example ESMTP Postfix</plugin_output>
+</ReportItem>
+<ReportItem port="25" svc_name="smtp" protocol="tcp" severity="1" pluginID="54582" pluginName="SMTP Service Cleartext Login Permitted" pluginFamily="Misc.">
+<cvss_base_score>2.6</cvss_base_score>
+<cvss_vector>CVSS2#AV:N/AC:H/Au:N/C:P/I:N/A:N</cvss_vector>
+<description>The remote SMTP server advertises that it allows cleartext logins (AUTH PLAIN or AUTH LOGIN) over an unencrypted connection. Anyone able to watch the traffic can read the credentials.</description>
+<plugin_name>SMTP Service Cleartext Login Permitted</plugin_name>
+<risk_factor>Low</risk_factor>
+<see_also>https://datatracker.ietf.org/doc/html/rfc4954</see_also>
+<solution>Configure the service to offer authentication only after STARTTLS, or to use an encrypted mechanism.</solution>
+<synopsis>The remote mail server allows cleartext logins.</synopsis>
+<xref>CWE:319</xref>
+<plugin_output>The SMTP server advertises the following SASL methods over an unencrypted channel :
+
+  All supported methods : LOGIN, PLAIN
+  Cleartext methods     : LOGIN, PLAIN</plugin_output>
+</ReportItem>
+<ReportItem port="3389" svc_name="msrdp" protocol="tcp" severity="2" pluginID="58453" pluginName="Terminal Services Doesn't Use Network Level Authentication (NLA) Only" pluginFamily="Misc.">
+<cvss3_base_score>4.8</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N</cvss3_vector>
+<description>The remote Terminal Services is not configured to use Network Level Authentication (NLA) only. NLA authenticates the user before a full RDP session is set up, which protects the server against denial of service and against attacks that need a session, and lets the client check the server's identity first.</description>
+<plugin_name>Terminal Services Doesn't Use Network Level Authentication (NLA) Only</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-allow-access</see_also>
+<solution>Enable Network Level Authentication (NLA) on the remote RDP server, under the Remote settings tab of System Properties.</solution>
+<synopsis>The remote Terminal Services doesn't use Network Level Authentication only.</synopsis>
+<plugin_output>Nessus was able to negotiate non-NLA (Standard RDP Security) security.</plugin_output>
+</ReportItem>
+<ReportItem port="3389" svc_name="msrdp" protocol="tcp" severity="2" pluginID="104743" pluginName="TLS Version 1.0 Protocol Detection" pluginFamily="Service detection">
+<cvss3_base_score>6.5</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N</cvss3_vector>
+<description>The remote service accepts connections encrypted using TLS 1.0. TLS 1.0 has several cryptographic design flaws, and PCI DSS has required it to be disabled since June 2018. Modern clients support TLS 1.2 and 1.3.</description>
+<plugin_name>TLS Version 1.0 Protocol Detection</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://datatracker.ietf.org/doc/html/rfc8996</see_also>
+<solution>Enable support for TLS 1.2 and 1.3, and disable support for TLS 1.0.</solution>
+<synopsis>The remote service encrypts traffic using an older version of TLS.</synopsis>
+<xref>CWE:327</xref>
+<plugin_output>TLSv1 is enabled and the server supports at least one cipher.</plugin_output>
+</ReportItem>
+<ReportItem port="3389" svc_name="msrdp" protocol="tcp" severity="3" pluginID="42873" pluginName="SSL Medium Strength Cipher Suites Supported (SWEET32)" pluginFamily="General">
+<cvss3_base_score>7.5</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N</cvss3_vector>
+<cvss_base_score>5.0</cvss_base_score>
+<cvss_vector>CVSS2#AV:N/AC:L/Au:N/C:P/I:N/A:N</cvss_vector>
+<cve>CVE-2016-2183</cve>
+<description>The remote host supports SSL/TLS cipher suites of medium strength: those with keys from 64 to 112 bits, or that use the 3DES suite. 64-bit block ciphers such as 3DES are vulnerable to the SWEET32 birthday attack on long-lived connections, and an attacker on the same network can break medium-strength encryption far more easily than strong encryption.</description>
+<plugin_name>SSL Medium Strength Cipher Suites Supported (SWEET32)</plugin_name>
+<risk_factor>High</risk_factor>
+<see_also>https://sweet32.info
+https://www.openssl.org/blog/blog/2016/08/24/sweet32/</see_also>
+<solution>Reconfigure the affected application, if possible, to avoid use of medium strength ciphers.</solution>
+<synopsis>The remote service supports the use of medium strength SSL ciphers.</synopsis>
+<xref>CWE:326</xref>
+<plugin_output>
+  Medium Strength Ciphers (&gt; 64-bit and &lt; 112-bit key, or 3DES)
+
+    Name                          Code             KEX           Auth     Encryption             MAC
+    ----------------------        ----------       ---           ----     ---------------------  ---
+    DES-CBC3-SHA                  0x00, 0x0A       RSA           RSA      3DES-CBC(168)          SHA1
+
+The fields above are :
+
+  {Tenable ciphername}
+  {Cipher ID code}
+  Kex={key exchange}
+  Auth={authentication}
+  Encrypt={symmetric encryption method}
+  MAC={message authentication code}
+  {export flag}
+</plugin_output>
+</ReportItem>
+</ReportHost>
+<ReportHost name="203.0.113.11"><HostProperties>
+<tag name="HOST_END">Sun Sep 20 16:03:40 2026</tag>
+<tag name="operating-system">Fortinet FortiOS</tag>
+<tag name="host-fqdn">vpn.acme-corp.example</tag>
+<tag name="host-ip">203.0.113.11</tag>
+<tag name="HOST_START">Sun Sep 20 15:42:10 2026</tag>
+</HostProperties>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 443/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="4" pluginID="190710" pluginName="Fortinet FortiOS SSL VPN Out-of-Bounds Write (FG-IR-24-015)" pluginFamily="Firewalls">
+<cvss3_base_score>9.8</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H</cvss3_vector>
+<cve>CVE-2024-21762</cve>
+<description>The version of FortiOS running on the remote device is affected by an out-of-bounds write in the SSL VPN daemon that may allow a remote unauthenticated attacker to execute code through crafted HTTP requests.</description>
+<plugin_name>Fortinet FortiOS SSL VPN Out-of-Bounds Write (FG-IR-24-015)</plugin_name>
+<risk_factor>Critical</risk_factor>
+<see_also>https://www.fortiguard.com/psirt/FG-IR-24-015</see_also>
+<solution>Upgrade FortiOS to a fixed release as described in the vendor advisory.</solution>
+<synopsis>The remote Fortinet device is affected by a remote code execution vulnerability.</synopsis>
+<xref>CWE:787</xref>
+<plugin_output>
+  Installed version : 7.2.6
+  Fixed version     : 7.2.7
+</plugin_output>
+</ReportItem>
+</ReportHost>
+<ReportHost name="198.51.100.7"><HostProperties>
+<tag name="HOST_END">Sun Sep 20 15:58:02 2026</tag>
+<tag name="host-fqdn">edge-lon3.cdn-provider.example</tag>
+<tag name="host-ip">198.51.100.7</tag>
+<tag name="HOST_START">Sun Sep 20 15:42:12 2026</tag>
+</HostProperties>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="0" pluginID="11219" pluginName="Nessus SYN scanner" pluginFamily="Port scanners">
+<description>This plugin is a SYN 'half-open' port scanner.</description>
+<plugin_name>Nessus SYN scanner</plugin_name>
+<risk_factor>None</risk_factor>
+<solution>Protect your target with an IP filter.</solution>
+<synopsis>It is possible to determine which TCP ports are open.</synopsis>
+<plugin_output>Port 443/tcp was found to be open</plugin_output>
+</ReportItem>
+<ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="142960" pluginName="HSTS Missing From HTTPS Server (RFC 6797)" pluginFamily="Web Servers">
+<cvss3_base_score>6.5</cvss3_base_score>
+<cvss3_vector>CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N</cvss3_vector>
+<description>The remote web server does not send the Strict-Transport-Security header defined by RFC 6797.</description>
+<plugin_name>HSTS Missing From HTTPS Server (RFC 6797)</plugin_name>
+<risk_factor>Medium</risk_factor>
+<see_also>https://datatracker.ietf.org/doc/html/rfc6797</see_also>
+<solution>Configure the remote web server to use HSTS.</solution>
+<synopsis>The remote web server is not enforcing HSTS, as defined by RFC 6797.</synopsis>
+<plugin_output>The remote HTTPS server does not send the HTTP "Strict-Transport-Security" header.</plugin_output>
+</ReportItem>
+</ReportHost>
+</Report>
+</NessusClientData_v2>

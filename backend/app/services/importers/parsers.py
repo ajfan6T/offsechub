@@ -280,4 +280,10 @@ def parse_list(data: bytes) -> ParseResult:
     return result
 
 
-PARSERS = {"nmap": parse_nmap_xml, "nuclei": parse_nuclei, "list": parse_list}
+# Burp Suite and Nessus have their own modules, which build on the classes above
+# (the package imports this module first, so either import order works).
+from .burp import parse_burp_xml  # noqa: E402
+from .nessus import parse_nessus  # noqa: E402
+
+PARSERS = {"nmap": parse_nmap_xml, "nuclei": parse_nuclei, "list": parse_list,
+           "burp": parse_burp_xml, "nessus": parse_nessus}

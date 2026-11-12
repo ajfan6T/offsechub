@@ -1,4 +1,4 @@
-"""Recon imports: Nmap XML, nuclei JSON/JSONL and plain host lists."""
+"""Recon imports: Nmap XML, nuclei JSON/JSONL, Burp Suite XML, Nessus files and host lists."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select

@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 
 from . import __version__
 
-IMPORT_TOOLS = ("nmap", "nuclei", "list")
+IMPORT_TOOLS = ("nmap", "nuclei", "list", "burp", "nessus")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -42,7 +42,8 @@ def _parser() -> argparse.ArgumentParser:
     o = sub.add_parser("open", help="print and open a one-time browser link to the running app")
     o.add_argument("--no-open", action="store_true", help="only print the link")
 
-    i = sub.add_parser("import", help="import Nmap, nuclei or host-list output into the running app")
+    i = sub.add_parser("import",
+                       help="import Nmap, nuclei, Burp, Nessus or host-list output into the running app")
     i.add_argument("engagement", help="engagement code (e.g. ACME-EXT-26) or numeric id")
     i.add_argument("file", type=Path, help="tool output file")
     i.add_argument("--tool", required=True, choices=IMPORT_TOOLS)

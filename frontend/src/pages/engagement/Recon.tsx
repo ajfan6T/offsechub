@@ -6,12 +6,17 @@ import { fmtDateTime } from "../../lib/format";
 import type { ReconImport } from "../../types";
 import { useEngagement } from "./context";
 
+// `hint` is a command line; `how` says where to export from in a GUI tool.
 const TOOLS = {
   nmap: { label: "Nmap XML", accept: ".xml", hint: "nmap -sV -O -oX scan.xml <range>", sample: "scan.xml" },
   nuclei: { label: "nuclei JSONL / JSON", accept: ".json,.jsonl,.txt", hint: "nuclei -l hosts.txt -jsonl -o nuclei.jsonl", sample: "nuclei.jsonl" },
+  burp: { label: "Burp Suite issues XML", accept: ".xml", how: "In Burp, select issues, right-click › Report selected issues › XML.", sample: "burp-issues.xml" },
+  nessus: { label: "Nessus (.nessus)", accept: ".nessus,.xml", how: "In Nessus, open the scan › Export › Nessus.", sample: "scan.nessus" },
   list: { label: "Host / URL list", accept: ".txt,.lst,.csv", hint: "subfinder -d example.com -o hosts.txt · httpx -l hosts.txt -o live.txt", sample: "hosts.txt" },
 } as const;
 type Tool = keyof typeof TOOLS;
+/** Tools whose results become draft findings, not only targets and services. */
+const FINDING_TOOLS: readonly string[] = ["nuclei", "burp", "nessus"];
 
 /** Quote a value for a POSIX shell unless it is plainly safe. */
 const shellArg = (s: string) => (/^[\w.@%+=:,/-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
@@ -24,7 +29,8 @@ export function Recon() {
   const [file, setFile] = useState<File | null>(null);
   const [last, setLast] = useState<ReconImport | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const cli = `offsechub import ${shellArg(engagement.code)} ${TOOLS[tool].sample} --tool ${tool}`;
+  const spec = TOOLS[tool];
+  const cli = `offsechub import ${shellArg(engagement.code)} ${spec.sample} --tool ${tool}`;
 
   const upload = useApiMutation(
     () => api.upload<ReconImport>(`${base}/imports/upload`, file!, { tool, skip_out_of_scope: skip }),
@@ -51,8 +57,8 @@ export function Recon() {
                 ))}
               </select>
             </Field>
-            <Field label="File" hint={<code className="mono">{TOOLS[tool].hint}</code>}>
-              <input ref={input} type="file" accept={TOOLS[tool].accept} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Field label="File" hint={"hint" in spec ? <code className="mono">{spec.hint}</code> : spec.how}>
+              <input ref={input} type="file" accept={spec.accept} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             </Field>
             <label className="check">
               <input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} />
@@ -70,8 +76,9 @@ export function Recon() {
           </p>
           <pre className="code">{cli}</pre>
           <p className="muted small">
-            nuclei results become <strong>draft findings</strong> grouped by template, one finding with every affected
-            host. Triage them in Findings. Raw files are kept as evidence with a SHA-256.
+            nuclei, Burp Suite and Nessus results become <strong>draft findings</strong> grouped by template, issue type
+            or plugin, one finding with every affected host (Nessus informational plugins only add services). Triage them
+            in Findings. Raw files are kept as evidence with a SHA-256.
           </p>
         </Card>
       </div>
@@ -114,7 +121,7 @@ function StatsLine({ rec }: { rec: ReconImport }) {
   return (
     <>
       +{s.targets_created} targets, +{s.services_created} services
-      {rec.tool === "nuclei" && <>, +{s.findings_created} findings</>}
+      {FINDING_TOOLS.includes(rec.tool) && <>, +{s.findings_created} findings</>}
       {skipped > 0 && <span className="warn-text">, {skipped} skipped (scope)</span>}
       {s.errors.length > 0 && <span className="error-text">, {s.errors.length} {s.errors.length === 1 ? "error" : "errors"}</span>}
     </>

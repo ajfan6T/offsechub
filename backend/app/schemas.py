@@ -32,7 +32,7 @@ FindingStatus = Literal[
 ]
 RetestResult = Literal["resolved", "partially_resolved", "not_resolved"]
 OplogOutcome = Literal["info", "success", "failure", "detected"]
-ImportTool = Literal["nmap", "nuclei", "list"]
+ImportTool = Literal["nmap", "nuclei", "list", "burp", "nessus"]
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 # Findings in these states appear in client-facing reports.

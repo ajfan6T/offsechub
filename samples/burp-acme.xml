@@ -1,0 +1,191 @@
+<?xml version="1.0"?>
+<!DOCTYPE issues [
+<!ELEMENT issues (issue*)>
+<!ATTLIST issues burpVersion CDATA "">
+<!ATTLIST issues exportTime CDATA "">
+<!ELEMENT issue (serialNumber, type, name, host, path, location, severity, confidence, issueBackground?, remediationBackground?, references?, vulnerabilityClassifications?, issueDetail?, issueDetailItems?, remediationDetail?, requestresponse*)>
+<!ELEMENT serialNumber (#PCDATA)>
+<!ELEMENT type (#PCDATA)>
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT host (#PCDATA)>
+<!ATTLIST host ip CDATA "">
+<!ELEMENT path (#PCDATA)>
+<!ELEMENT location (#PCDATA)>
+<!ELEMENT severity (#PCDATA)>
+<!ELEMENT confidence (#PCDATA)>
+<!ELEMENT issueBackground (#PCDATA)>
+<!ELEMENT remediationBackground (#PCDATA)>
+<!ELEMENT references (#PCDATA)>
+<!ELEMENT vulnerabilityClassifications (#PCDATA)>
+<!ELEMENT issueDetail (#PCDATA)>
+<!ELEMENT issueDetailItems (issueDetailItem*)>
+<!ELEMENT issueDetailItem (#PCDATA)>
+<!ELEMENT remediationDetail (#PCDATA)>
+<!ELEMENT requestresponse (request?, response?, responseRedirected?)>
+<!ELEMENT request (#PCDATA)>
+<!ATTLIST request method CDATA "">
+<!ATTLIST request base64 (true|false) "false">
+<!ELEMENT response (#PCDATA)>
+<!ATTLIST response base64 (true|false) "false">
+<!ELEMENT responseRedirected (#PCDATA)>
+]>
+<issues burpVersion="2026.8.2" exportTime="Sun Sep 20 14:05:33 UTC 2026">
+  <issue>
+    <serialNumber>5612301045384567808</serialNumber>
+    <type>2097920</type>
+    <name>Cross-site scripting (reflected)</name>
+    <host ip="203.0.113.14">https://portal.acme-corp.example</host>
+    <path><![CDATA[/search]]></path>
+    <location><![CDATA[/search [q parameter]]]></location>
+    <severity>High</severity>
+    <confidence>Certain</confidence>
+    <issueBackground><![CDATA[<p>Reflected cross-site scripting arises when an application takes data from a request and includes it in its immediate response without making it safe.</p><p>An attacker can build a link or form that, when a victim follows or submits it, runs the attacker's JavaScript in the victim's browser in the context of the application. The script can read the victim's session data, act on the victim's behalf and change what the page shows.</p>]]></issueBackground>
+    <remediationBackground><![CDATA[<p>Prevent the issue in depth:</p><ul><li>Validate input as strictly as possible when it arrives, for example by allowing only expected characters for a <i>search term</i>.</li><li>HTML-encode user input wherever it is written into a response. Use the encoding that fits the context: HTML body, attribute, JavaScript or URL.</li><li>Add a Content Security Policy that blocks inline script.</li></ul>]]></remediationBackground>
+    <references><![CDATA[<ul><li><a href="https://portswigger.net/web-security/cross-site-scripting">Web Security Academy: Cross-site scripting</a></li><li><a href="https://portswigger.net/web-security/cross-site-scripting/reflected">Web Security Academy: Reflected cross-site scripting</a></li><li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html">OWASP XSS Prevention Cheat Sheet</a></li></ul>]]></references>
+    <vulnerabilityClassifications><![CDATA[<ul><li><a href="https://cwe.mitre.org/data/definitions/79.html">CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')</a></li><li><a href="https://cwe.mitre.org/data/definitions/80.html">CWE-80: Improper Neutralization of Script-Related HTML Tags in a Web Page (Basic XSS)</a></li><li><a href="https://cwe.mitre.org/data/definitions/116.html">CWE-116: Improper Encoding or Escaping of Output</a></li><li><a href="https://capec.mitre.org/data/definitions/591.html">CAPEC-591: Reflected XSS</a></li></ul>]]></vulnerabilityClassifications>
+    <issueDetail><![CDATA[The value of the <b>q</b> request parameter is copied into the HTML document as plain text between tags. The payload <b>abc&lt;script&gt;alert(1)&lt;/script&gt;xyz</b> was submitted in the q parameter. This input was echoed unmodified in the application's response.<br><br>This proof-of-concept attack demonstrates that it is possible to inject arbitrary JavaScript into the application's response.]]></issueDetail>
+    <requestresponse>
+      <request method="GET" base64="true"><![CDATA[R0VUIC9zZWFyY2g/cT1hYmMlM2NzY3JpcHQlM2VhbGVydCgxKSUzYyUyZnNjcmlwdCUzZXh5eiZsYW5nPWVuIEhUVFAvMg0KSG9zdDogcG9ydGFsLmFjbWUtY29ycC5leGFtcGxlDQpDb29raWU6IHBvcnRhbF9zZXNzaW9uPTNjOWYxZTdhNTJiODRkMDZhMWUyZjRjOGQ5YjBhN2U1DQpVc2VyLUFnZW50OiBNb3ppbGxhLzUuMCAoV2luZG93cyBOVCAxMC4wOyBXaW42NDsgeDY0KSBBcHBsZVdlYktpdC81MzcuMzYgKEtIVE1MLCBsaWtlIEdlY2tvKSBDaHJvbWUvMTI5LjAuMC4wIFNhZmFyaS81MzcuMzYNCkFjY2VwdDogdGV4dC9odG1sLGFwcGxpY2F0aW9uL3hodG1sK3htbCxhcHBsaWNhdGlvbi94bWw7cT0wLjksKi8qO3E9MC44DQpBY2NlcHQtTGFuZ3VhZ2U6IGVuLUdCLGVuO3E9MC45DQpSZWZlcmVyOiBodHRwczovL3BvcnRhbC5hY21lLWNvcnAuZXhhbXBsZS8NCg0K]]></request>
+      <response base64="true"><![CDATA[SFRUUC8yIDIwMCBPSw0KU2VydmVyOiBuZ2lueC8xLjE4LjANCkNvbnRlbnQtVHlwZTogdGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04DQpDYWNoZS1Db250cm9sOiBuby1zdG9yZQ0KQ29udGVudC1MZW5ndGg6IDQxMg0KDQo8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0iZW4iPgo8aGVhZD48dGl0bGU+U2VhcmNoIC0gQUNNRSBDdXN0b21lciBQb3J0YWw8L3RpdGxlPjwvaGVhZD4KPGJvZHk+CjxoZWFkZXI+PGEgaHJlZj0iLyI+QUNNRSBDdXN0b21lciBQb3J0YWw8L2E+PC9oZWFkZXI+CjxtYWluPgo8aDE+U2VhcmNoIHJlc3VsdHM8L2gxPgo8cCBjbGFzcz0iZW1wdHkiPk5vIG9yZGVycyBvciBpbnZvaWNlcyBtYXRjaCBhYmM8c2NyaXB0PmFsZXJ0KDEpPC9zY3JpcHQ+eHl6PC9wPgo8L21haW4+CjwvYm9keT4KPC9odG1sPgo=]]></response>
+      <responseRedirected>false</responseRedirected>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>2290447315528803328</serialNumber>
+    <type>16777984</type>
+    <name>Strict transport security not enforced</name>
+    <host ip="203.0.113.10">https://www.acme-corp.example</host>
+    <path><![CDATA[/]]></path>
+    <location><![CDATA[/]]></location>
+    <severity>Low</severity>
+    <confidence>Certain</confidence>
+    <issueBackground><![CDATA[<p>Sites that handle sensitive data should be reachable only over HTTPS, but a user who types the address or follows an <b>http://</b> link still makes a first request in clear text. An attacker on the network path can intercept it and keep the user on an unencrypted connection, for example with a tool such as sslstrip.</p><p>The HTTP Strict Transport Security (HSTS) header tells browsers to use HTTPS for the site, so later requests are never sent in clear text.</p>]]></issueBackground>
+    <remediationBackground><![CDATA[<p>Send the header <code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code> on every HTTPS response. Once all subdomains support HTTPS, consider adding the <code>preload</code> directive and submitting the domain to the browsers' preload list.</p>]]></remediationBackground>
+    <references><![CDATA[<ul><li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security">MDN: Strict-Transport-Security</a></li><li><a href="https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html">OWASP HTTP Strict Transport Security Cheat Sheet</a></li></ul>]]></references>
+    <vulnerabilityClassifications><![CDATA[<ul><li><a href="https://cwe.mitre.org/data/definitions/523.html">CWE-523: Unprotected Transport of Credentials</a></li></ul>]]></vulnerabilityClassifications>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET / HTTP/1.1
+Host: www.acme-corp.example
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Connection: close
+
+]]></request>
+      <response base64="false"><![CDATA[HTTP/1.1 200 OK
+Server: nginx/1.18.0
+Content-Type: text/html; charset=utf-8
+Content-Length: 5120
+
+<!DOCTYPE html>
+<html lang="en"><head><title>ACME Corporation</title></head>
+]]></response>
+      <responseRedirected>false</responseRedirected>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>2290447315528803329</serialNumber>
+    <type>16777984</type>
+    <name>Strict transport security not enforced</name>
+    <host ip="203.0.113.14">https://portal.acme-corp.example</host>
+    <path><![CDATA[/login]]></path>
+    <location><![CDATA[/login]]></location>
+    <severity>Low</severity>
+    <confidence>Certain</confidence>
+    <issueBackground><![CDATA[<p>Sites that handle sensitive data should be reachable only over HTTPS, but a user who types the address or follows an <b>http://</b> link still makes a first request in clear text. An attacker on the network path can intercept it and keep the user on an unencrypted connection, for example with a tool such as sslstrip.</p><p>The HTTP Strict Transport Security (HSTS) header tells browsers to use HTTPS for the site, so later requests are never sent in clear text.</p>]]></issueBackground>
+    <remediationBackground><![CDATA[<p>Send the header <code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code> on every HTTPS response. Once all subdomains support HTTPS, consider adding the <code>preload</code> directive and submitting the domain to the browsers' preload list.</p>]]></remediationBackground>
+    <references><![CDATA[<ul><li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security">MDN: Strict-Transport-Security</a></li><li><a href="https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html">OWASP HTTP Strict Transport Security Cheat Sheet</a></li></ul>]]></references>
+    <vulnerabilityClassifications><![CDATA[<ul><li><a href="https://cwe.mitre.org/data/definitions/523.html">CWE-523: Unprotected Transport of Credentials</a></li></ul>]]></vulnerabilityClassifications>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET /login HTTP/2
+Host: portal.acme-corp.example
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+
+]]></request>
+      <response base64="false"><![CDATA[HTTP/2 200 OK
+Server: nginx/1.18.0
+Content-Type: text/html; charset=utf-8
+Set-Cookie: portal_session=3c9f1e7a52b84d06a1e2f4c8d9b0a7e5; Path=/; Secure; HttpOnly
+
+]]></response>
+      <responseRedirected>false</responseRedirected>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>2290447315528803330</serialNumber>
+    <type>16777984</type>
+    <name>Strict transport security not enforced</name>
+    <host ip="203.0.113.11">https://vpn.acme-corp.example</host>
+    <path><![CDATA[/remote/login]]></path>
+    <location><![CDATA[/remote/login]]></location>
+    <severity>Low</severity>
+    <confidence>Certain</confidence>
+    <issueBackground><![CDATA[<p>Sites that handle sensitive data should be reachable only over HTTPS, but a user who types the address or follows an <b>http://</b> link still makes a first request in clear text.</p>]]></issueBackground>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET /remote/login HTTP/1.1
+Host: vpn.acme-corp.example
+
+]]></request>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>7741182093316702208</serialNumber>
+    <type>5245360</type>
+    <name>Vulnerable JavaScript dependency</name>
+    <host ip="203.0.113.10">https://www.acme-corp.example</host>
+    <path><![CDATA[/assets/js/jquery-1.12.4.min.js]]></path>
+    <location><![CDATA[/assets/js/jquery-1.12.4.min.js]]></location>
+    <severity>Low</severity>
+    <confidence>Tentative</confidence>
+    <issueBackground><![CDATA[<p>Third-party JavaScript libraries run with the full privileges of the page that loads them. A library with known vulnerabilities can give an attacker a way to run script in users' browsers (DOM-based XSS) or to tamper with the page's behaviour.</p><p>Popular libraries are widely reviewed, so their flaws are found and fixed regularly, and every release that is not applied leaves publicly documented weaknesses in place.</p>]]></issueBackground>
+    <remediationBackground><![CDATA[<p>Upgrade the library to a supported release that fixes the listed vulnerabilities, and remove libraries the site no longer uses. Track third-party components so that security releases are applied promptly.</p>]]></remediationBackground>
+    <vulnerabilityClassifications><![CDATA[<ul><li><a href="https://cwe.mitre.org/data/definitions/1104.html">CWE-1104: Use of Unmaintained Third Party Components</a></li><li><a href="https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/">A06: Vulnerable and Outdated Components</a></li></ul>]]></vulnerabilityClassifications>
+    <issueDetail><![CDATA[We observed a vulnerable JavaScript library.<br><br>We detected <b>jquery</b> version <b>1.12.4</b>, which has the following vulnerabilities:<ul><li>CVE-2015-9251: Cross-site scripting when a cross-domain Ajax request is made without the <code>dataType</code> option.</li><li>CVE-2019-11358: Object.prototype pollution through <code>jQuery.extend(true, {}, ...)</code>.</li><li>CVE-2020-11022: Cross-site scripting when HTML from untrusted sources is passed to DOM manipulation methods.</li></ul>]]></issueDetail>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET /assets/js/jquery-1.12.4.min.js HTTP/1.1
+Host: www.acme-corp.example
+Accept: */*
+Referer: https://www.acme-corp.example/
+
+]]></request>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>3150926640918431744</serialNumber>
+    <type>5245344</type>
+    <name>Frameable response (potential Clickjacking)</name>
+    <host ip="203.0.113.10">https://www.acme-corp.example</host>
+    <path><![CDATA[/contact]]></path>
+    <location><![CDATA[/contact]]></location>
+    <severity>Information</severity>
+    <confidence>Firm</confidence>
+    <issueBackground><![CDATA[<p>If a page fails to say whether other sites may frame it, an attacker can load it in an invisible frame on a page they control and trick a user into clicking buttons or links on it. This is known as clickjacking.</p><p>Whether this matters depends on what the page does: a page that only displays public content is low risk, while a page with state-changing actions is not.</p>]]></issueBackground>
+    <remediationBackground><![CDATA[<p>Send a <code>Content-Security-Policy</code> header with the <code>frame-ancestors 'self'</code> directive (or <code>'none'</code>), and <code>X-Frame-Options: SAMEORIGIN</code> for older browsers.</p>]]></remediationBackground>
+    <references><![CDATA[<ul><li><a href="https://portswigger.net/web-security/clickjacking">Web Security Academy: Clickjacking</a></li></ul>]]></references>
+    <vulnerabilityClassifications><![CDATA[<ul><li><a href="https://cwe.mitre.org/data/definitions/693.html">CWE-693: Protection Mechanism Failure</a></li><li><a href="https://cwe.mitre.org/data/definitions/1021.html">CWE-1021: Improper Restriction of Rendered UI Layers or Frames</a></li></ul>]]></vulnerabilityClassifications>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET /contact HTTP/1.1
+Host: www.acme-corp.example
+Accept: text/html
+
+]]></request>
+    </requestresponse>
+  </issue>
+  <issue>
+    <serialNumber>3150926640918431745</serialNumber>
+    <type>5245344</type>
+    <name>Frameable response (potential Clickjacking)</name>
+    <host ip="198.51.100.23">https://careers.talentportal.example</host>
+    <path><![CDATA[/acme/jobs]]></path>
+    <location><![CDATA[/acme/jobs]]></location>
+    <severity>Information</severity>
+    <confidence>Firm</confidence>
+    <issueBackground><![CDATA[<p>If a page fails to say whether other sites may frame it, an attacker can load it in an invisible frame on a page they control and trick a user into clicking buttons or links on it.</p>]]></issueBackground>
+    <requestresponse>
+      <request method="GET" base64="false"><![CDATA[GET /acme/jobs HTTP/1.1
+Host: careers.talentportal.example
+
+]]></request>
+    </requestresponse>
+  </issue>
+</issues>
