@@ -32,6 +32,8 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | The vault password and recovery key | the user's head, a password manager, a printed recovery kit |
 | The master key | RAM, only while unlocked |
 | Engagement metadata (which clients, when) | inside the vault. Folder names, recent-vault paths and file timestamps are outside it (§7). |
+| An engagement handed to a colleague | a passphrase-encrypted hand-off file (`.ohengagement`) in transit: email, chat, a shared drive, USB |
+| Report templates and the report logo | inside the vault (`report_assets`), so a client's branding is protected like its data |
 
 ## 3. Adversaries
 
@@ -89,13 +91,30 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | XSS escalating to the host through the JS bridge | pywebview dispatches dotted attribute paths without an allow-list (`fn.__globals__…`). OffsecHub passes no JS API object and **replaces the dispatcher**: only three exact names are callable, each opens a native dialog the user must confirm, each checks that the calling page is OffsecHub's own, and none holds a reference to the vault. `save_download` accepts only a same-origin `/api/` path. | `test_bridge_dispatch_refuses_everything_but_exposed_names`, `test_bridge_functions_only_serve_the_app_page`, `test_download_paths_refused` |
 | Script in the page navigating the window elsewhere (phishing inside the app frame) | A navigation guard reloads the app if the window leaves its origin; external links open in the system browser. | `test_navigation_guard_returns_to_the_app` |
 | Weakening the CSP to make the bridge work | pywebview needs `eval` and `new Function`. OffsecHub rebuilds both halves of the bridge without them instead of allowing `'unsafe-eval'`. | `test_page_side_api_works_without_eval` |
-| Hostile XML in imports | `defusedxml`, which rejects entity expansion and external entities. | `test_xml_entity_expansion_is_rejected`, `test_external_entities_are_rejected` |
+| Hostile XML in imports | `defusedxml`, which rejects entity expansion and external entities. Burp and Nessus put HTML in their XML: it is converted to plain text with Markdown formatting, never kept as HTML. | `test_xml_entity_expansion_is_rejected`, `test_external_entities_are_rejected`, `test_html_to_markdown_renders_the_same_text` |
+| Markup injected through finding text | Finding fields take a small Markdown subset, parsed into a structure, never passed through as HTML. Links are allowed only to `http`, `https` and `mailto`; in the app they are shown, not followed. Each report format (HTML, PDF, Word, Markdown) escapes text for that format: ReportLab paragraph markup and Word XML cannot be injected, and XML-invalid control characters are removed. | `test_links_only_safe_schemes`, `test_html_never_emits_unescaped_markup`, `test_user_text_is_never_reportlab_markup`, `test_builtin_docx_report` |
+| A hostile Word report template (template injection, resource exhaustion, XML attacks) | A template is a docxtpl document: Word content with Jinja tags, and it may come from anyone. It renders in Jinja's **sandbox** with autoescaping, so a tag can read the report context but cannot reach Python internals. Huge repetitions and powers are refused. On upload, and again before every render, the file is checked: at most 5 MB, a bounded zip (entry count and unpacked size), no `<!DOCTYPE` or `<!ENTITY` in any XML part, and valid template syntax. | `test_hostile_templates_are_refused`, `test_template_file_checks` |
+| Spreadsheet formula injection through exported findings (CSV for Jira) | Every cell that starts with `=`, `+`, `-`, `@`, a tab or a line break is prefixed with `'`, so a spreadsheet shows it as text. Finding text often quotes what the target returned. | `test_formula_cells_are_prefixed` |
+
+### Hand-off files (A1, A2 for files in transit; a hostile file from anyone)
+
+A hand-off file carries one engagement, evidence included, from one vault to another ([VAULT_FORMAT.md §9](VAULT_FORMAT.md#9-hand-off-files-ohengagement)).
+
+| Threat | Control | Proof |
+|---|---|---|
+| Reading an intercepted file | AES-256-GCM (STREAM) under a key derived with Argon2id from a passphrase. The app suggests a random passphrase of about 118 bits, to be sent over a different channel from the file. | `test_round_trip_into_another_vault` |
+| Changing, truncating or reordering a file | Every chunk is authenticated, the header is bound in as associated data, and the last chunk is marked. Nothing is imported until the whole file has been authenticated. | `test_wrong_passphrase_tampering_and_truncation` |
+| A crafted file that makes Argon2 exhaust memory or time | The KDF parameters in the header are checked against the same limits as a vault's before any key derivation. | `test_hostile_kdf_settings_are_refused_before_argon2` |
+| Valid encryption around hostile contents | The manifest is validated field by field, and each evidence file must match the SHA-256 the manifest lists. On any error, the import is rolled back and the evidence written so far is deleted. | `test_invalid_contents_are_refused` |
+| Overwriting work in the receiving vault | An import always creates a new engagement. If its code is taken, it gets a new one. | `test_import_into_the_same_vault_renames_the_code` |
+
+Anyone with the passphrase can read the file. It does not identify the sender, and it carries no signature.
 
 ## 5. Security-relevant design decisions
 
 - **The same cryptography as serious tools, no novel primitives.** Argon2id, HKDF, AES-GCM and the STREAM construction, all from maintained libraries. The format is fully specified, with known-answer vectors cross-checked against the reference Argon2 CLI, OpenSSL and PyCryptodome. An **independent decoder** (`tools/ohvault_decrypt.py`) is written from the spec alone.
 - **Fail safe on the side of data.** A failed save never discards changes. A newer format version is refused ("please upgrade"), not treated as corruption. Orphaned files are reported, never auto-deleted.
-- **No network.** OffsecHub makes no outbound connections. External links open in the system browser.
+- **One network request, only when you ask for it.** OffsecHub makes no outbound connections of its own, with one exception. **Settings > Check for updates** sends one HTTPS GET to `api.github.com/repos/ajfan6T/offsechub/releases/latest`. It sends no vault data and no identifier beyond what any HTTPS request carries: your IP address, and a User-Agent naming the app version. It never runs by itself, and it downloads and installs nothing. A newer version is shown as a link to the releases page. External links open in the system browser.
 
 ## 6. Out of scope, stated plainly
 
@@ -114,7 +133,9 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 | App config (`config.json`) | recent vault *paths*, per-vault high-water marks | "Remember recent vaults" can be switched off; on Windows it lives in Local, not Roaming, AppData |
 | `runtime.json` | port and bearer token while running | 0600 in a per-user runtime directory; deleted on exit |
 | `offsechub.log` (installed app, which has no console) | errors, warnings and vault *paths*; never vault content or secrets | in the per-user config directory; rotated at 1 MB |
-| **Exports you save** | reports (HTML, Markdown, JSON), evidence downloads, CSVs | by definition plaintext. Every export is recorded in Activity, and the UI says so. |
+| **Exports you save** | reports (PDF, Word, HTML, Markdown, JSON), findings for ticketing (CSV, SARIF, DefectDojo), evidence downloads, operator-log CSVs | by definition plaintext. Every export is recorded in Activity, and the UI says so. |
+| Hand-off files | an engagement with its evidence, **encrypted** with a passphrase | protected only as well as the passphrase is chosen and kept: use the suggested one, and send it separately |
+| A temporary file while a hand-off file is imported | the hand-off file as received: **still encrypted** | the system temp directory; deleted when the import ends |
 | `--browser` mode | the session cookie is scoped to host `127.0.0.1`, **not the port**, so another local web server the browser later visits on 127.0.0.1 would receive it; the (already redeemed) one-time link can land in browser history | Documented as reduced-security mode with a startup warning. The link reaches the browser through a 0600 redirect page, not its command line. Use the desktop window, whose cookie jar is private and ephemeral. |
 
 ## 8. Residual risks and roadmap
@@ -123,4 +144,5 @@ Related documents: [VAULT_FORMAT.md](VAULT_FORMAT.md) (the on-disk cryptography)
 - Signed, timestamped evidence manifests (Ed25519 plus RFC 3161).
 - Locking on OS sleep and session-lock events.
 - Running the unlocked vault in a short-lived child process, so locking returns memory to the OS.
+- Signed hand-off files, so the receiver can tell who sent one.
 - Reproducible builds and an SBOM. Signed and notarized releases are wired into CI and switch on once the signing credentials exist ([CODE_SIGNING.md](CODE_SIGNING.md)).

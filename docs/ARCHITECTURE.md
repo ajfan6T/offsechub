@@ -1,6 +1,6 @@
 # OffsecHub architecture (local-first desktop)
 
-OffsecHub is a **single-operator, local-first desktop application**. All engagement data (scope, targets, findings, evidence, operator logs) lives in an **encrypted vault on the tester's own disk**. There is no server, no account and no network dependency. The app never phones home.
+OffsecHub is a **single-operator, local-first desktop application**. All engagement data (scope, targets, findings, evidence, operator logs) lives in an **encrypted vault on the tester's own disk**. There is no server, no account and no network dependency. The app never phones home: the only request it can make is an update check, and only when the user clicks it.
 
 ## Why local-first
 
@@ -107,6 +107,7 @@ All domain endpoints keep their existing paths and payloads, minus the fields re
 | `GET /api/app/recent` | none | `[{path, name, exists}]`, from plaintext app config. Only paths are stored. |
 | `DELETE /api/app/recent` | `{path}` (optional; omit to clear all) | 204 |
 | `GET /api/app/info` | none | `{version, desktop: bool, data_dir}` |
+| `POST /api/app/update-check` | none | `{current, latest, newer, published_at, download_url}`. The app's only outbound request (one HTTPS GET to GitHub's latest-release API), made only when the user clicks *Check for updates*. 502 if it fails. |
 
 | `POST /api/vault/close` | none | `status`. Locks and returns to the vault picker. |
 | `POST /api/vault/reset-password` | `{recovery_key, new_password}` | `{recovery_key, recovery_kit}`. Only after a recovery-key unlock; it also rotates the exposed recovery key. |
@@ -122,8 +123,26 @@ Multipart parsing spools uploads over 1 MiB to **plaintext temp files**, so thes
 | Method and path | Body | Result |
 |---|---|---|
 | `POST /api/engagements/{id}/evidence/upload?filename=&description=&finding_id=&target_id=&test_case_id=` | raw file bytes; `Content-Type` = file type | `Evidence`. Streamed chunk by chunk into the encryptor (RAM ≈ one 64 KiB chunk). |
-| `POST /api/engagements/{id}/imports/upload?tool=nmap\|nuclei\|list&filename=&skip_out_of_scope=true` | raw file bytes | `ReconImport`. Parsed in memory; the raw file is kept as an evidence blob. |
+| `POST /api/engagements/{id}/imports/upload?tool=nmap\|nuclei\|burp\|nessus\|list&filename=&skip_out_of_scope=true` | raw file bytes | `ReconImport`. Parsed in memory; the raw file is kept as an evidence blob. |
+| `POST /api/report-branding/logo` | raw PNG or JPEG (max 1 MB) | branding settings |
+| `POST /api/report-templates/upload?filename=&name=` | raw `.docx` (max 5 MB) | the template. Checked before it is stored (see the threat model). |
+| `POST /api/handoff/import` | raw hand-off file; passphrase in the `X-Handoff-Passphrase` header | 201 and `{engagement_id, code, renamed, findings, evidence_files}`. The file is spooled to an anonymous temp file (it is still ciphertext), then decrypted chunk by chunk. |
 | `GET /api/engagements/{id}/evidence/{eid}/download[?inline=true]` | none | Streams with `Content-Length`, verifies size and SHA-256 at the end, and aborts the connection on mismatch. Inline is allowed only for raster images. |
+
+### Reports, exports, retests and hand-off
+
+| Method and path | Body | Result |
+|---|---|---|
+| `GET /api/engagements/{id}/report?format=html\|md\|json\|docx\|pdf&include_drafts=&download=&template_id=` | none | The report. Word uses `template_id`, else the default template in branding settings, else the built-in one. A broken template is a 422 with the reason. |
+| `GET /api/engagements/{id}/export/findings?format=csv\|sarif\|defectdojo&include_drafts=` | none | Findings for ticketing tools: CSV for Jira (formula-defused), SARIF 2.1.0, DefectDojo generic JSON |
+| `GET` / `PUT /api/report-branding` | `{organization, accent, classification, footer, default_template_id}` | branding settings, kept inside the vault |
+| `GET` / `DELETE /api/report-branding/logo` | none | the logo image / 204 |
+| `GET /api/report-templates` | none | uploaded Word templates (metadata only) |
+| `GET /api/report-templates/builtin/download`, `GET /api/report-templates/{tid}/download` | none | the `.docx` |
+| `DELETE /api/report-templates/{tid}` | none | 204. Clears the default if it was this one. |
+| `POST /api/engagements/{id}/findings/{fid}/retests` | `{tested_on?, result, tester?, notes}` | 201 and the retest. A *resolved* retest of a confirmed or reported finding marks it remediated. |
+| `DELETE /api/engagements/{id}/findings/{fid}/retests/{rid}` | none | 204 |
+| `POST /api/engagements/{id}/handoff` | `{directory, passphrase, filename?}` | `{path, bytes, findings, evidence_files}`. Writes a new file and never overwrites one. |
 
 ### Removed
 
@@ -155,7 +174,7 @@ tools/              ohvault_decrypt.py: independent, spec-only decoder (no-lock-
 2. **In-memory SQLite plus encrypted snapshots over SQLCipher.** There's no native dependency, since `cryptography` and `argon2-cffi` ship wheels for every desktop platform. The file format is simple enough to document fully and plaintext never touches disk. The costs are RAM use proportional to database size (fine for engagement data) and a coalesced save after every commit, with atomic replace and a `.bak` fallback.
 3. **Per-file keys from random salts.** No nonce bookkeeping, and no key is ever reused across messages.
 4. **Localhost HTTP over a pure JS bridge.** The HTTP path lets downloads, images, iframes and streaming uploads work unchanged. The bridge is used only for native dialogs. The risks of localhost HTTP are addressed explicitly (see the table above).
-5. **Single operator.** Collaboration becomes **encrypted engagement export and import** (roadmap), not a shared server.
+5. **Single operator.** Collaboration is an **encrypted engagement hand-off file** ([VAULT_FORMAT.md §9](VAULT_FORMAT.md#9-hand-off-files-ohengagement)), not a shared server. One tester passes an engagement to another, who imports it into their own vault.
 6. **Per-blob random keys stored in the database,** rather than keys derived from the master key.
    - *Gain:* deleting a row erases the file cryptographically, and a rekey needs no blob re-encryption.
    - *Cost:* an orphaned blob (its row lost in a crash before the save) can't be recovered. Group commit makes that window tiny, and "Verify vault" reports orphans.
@@ -164,3 +183,6 @@ tools/              ohvault_decrypt.py: independent, spec-only decoder (no-lock-
    - *Cost:* the database ceiling is set explicitly instead (1 GiB, via `max_page_count`), because RAM use is about 3× the database size while saving. A warning appears at 256 MB.
 8. **Refuse, don't repair, what we don't understand.** A newer snapshot or header version is an "upgrade OffsecHub" error, never quarantine or fallback.
 9. **Rebuild the bridge rather than relax the CSP.** pywebview creates its page-side API with `new Function` and returns results through `eval`, both of which `script-src 'self'` blocks. Adding `'unsafe-eval'` would have been a one-word fix that weakens the main XSS control for every page. Instead the shell injects a closure-based `_createApi` and returns results with `run_js` as JSON literals. A test runs pywebview's real `api.js` in Node with string code generation disabled to prove both halves.
+10. **A Markdown subset for finding text, not HTML or a rich-text editor.** Testers write in a textarea, as they do in tickets. The text is parsed into a structure (paragraphs, headings, lists, code blocks; bold, italic, code, links), and each output builds from that: React elements in the app, escaped HTML, ReportLab flowables, Word paragraphs. No user text is ever passed through as markup. The rules are strict on purpose, so pentest text such as `*.example.com`, `__init__.py` or `2*3*4` stays literal. The Python parser and its TypeScript port are checked against each other on random input.
+11. **Word reports from docxtpl templates; PDF from ReportLab.** Consultancies already keep their report layouts in Word, so a Word template is the customisation people can actually use. docxtpl renders Jinja tags inside a `.docx`, in Jinja's sandbox. PDFs are built directly with ReportLab (BSD) and the bundled DejaVu fonts, rather than through a browser engine. WeasyPrint needs Pango on every platform, and fpdf2 is LGPL-3.0.
+12. **Vault schema versions, migrated on unlock.** The database records its schema version. Unlocking an older vault runs the migration steps; a vault from a newer OffsecHub is refused with "please upgrade", in line with decision 8.

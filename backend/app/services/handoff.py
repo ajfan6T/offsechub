@@ -2,7 +2,7 @@
 
 OffsecHub is single-operator. To pass an engagement to a colleague (or move it
 to another vault), export it to a ``.ohengagement`` file, send the file, and
-share the passphrase over a different channel. docs/VAULT_FORMAT.md §8 is the
+share the passphrase over a different channel. docs/VAULT_FORMAT.md §9 is the
 normative description; in short:
 
     header  "OHEX" | version 1 | Argon2id m_kib (u32) | t (u8) | p (u8) | salt (32) | chunk size (u32)

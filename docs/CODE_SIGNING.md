@@ -60,7 +60,7 @@ Artifact Signing (renamed from Trusted Signing in 2026) is Microsoft's code-sign
    | `ARTIFACT_SIGNING_ACCOUNT` | the account name |
    | `ARTIFACT_SIGNING_PROFILE` | the certificate profile name |
 
-**Not eligible?** Since 2023, code-signing keys must be stored on hardware, so certificate authorities no longer issue `.pfx` files. Buy an OV certificate from a CA that offers cloud signing, for example DigiCert KeyLocker or SSL.com eSigner. Then change the `signtool` arguments in `Get-SigningConfig` in `sign.ps1` to that vendor's. Open-source projects can also apply to the SignPath Foundation for free signing; that requires an OSI-approved license, which this repository doesn't have yet.
+**Not eligible?** Since 2023, code-signing keys must be stored on hardware, so certificate authorities no longer issue `.pfx` files. Buy an OV certificate from a CA that offers cloud signing, for example DigiCert KeyLocker or SSL.com eSigner. Then change the `signtool` arguments in `Get-SigningConfig` in `sign.ps1` to that vendor's. Open-source projects can also apply to the SignPath Foundation for free signing. It requires an OSI-approved licence, which this repository has (MIT).
 
 ### SmartScreen reputation
 

@@ -67,7 +67,9 @@ a = Analysis(  # noqa: F821
     # python-docx opens docx/parts/../templates/*.xml (headers, footers, styles,
     # settings, comments). On macOS and Linux that path needs a real docx/parts
     # folder, so its sources are collected too; the modules still load from the archive.
-    module_collection_mode={"docx": "pyz+py"},
+    # docxtpl (LGPL-2.1) ships as plain .py files, so a user can replace it
+    # (see THIRD_PARTY_NOTICES.md).
+    module_collection_mode={"docx": "pyz+py", "docxtpl": "py"},
     noarchive=False,
 )
 pyz = PYZ(a.pure)  # noqa: F821

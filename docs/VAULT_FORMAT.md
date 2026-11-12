@@ -194,6 +194,33 @@ See [THREAT_MODEL.md](THREAT_MODEL.md).
 - **Memory hygiene.** Key buffers are `bytearray`s overwritten on lock, but CPython and OpenSSL may hold copies. Decrypted data can reach **swap** unless OS swap encryption is on (the default on macOS, and on Windows with BitLocker).
 - **Plaintext exports.** Report and evidence exports you save are, by design, plaintext files outside the vault.
 
+## 9. Hand-off files (`.ohengagement`)
+
+A hand-off file carries one engagement, with its evidence, from one vault to another (for example to a colleague who takes over a retest). It is independent of any vault: it is encrypted under a **passphrase** that is shared over a different channel from the file. The code is `backend/app/services/handoff.py`.
+
+```
+header (47 bytes): "OHEX" ‖ version=1 ‖ m_kib (uint32 BE) ‖ t (uint8) ‖ p (uint8) ‖ salt (32) ‖ chunk_size = 65536 (uint32 BE)
+key:               HKDF-SHA256(ikm = Argon2id(passphrase, salt, m_kib, t, p), salt = empty, info = "offsechub/v1/handoff")
+body:              STREAM (§5) under that key, aad = header, over the plaintext:
+                   manifest length (uint32 BE) ‖ manifest (UTF-8 JSON) ‖ each evidence file's bytes, in manifest order
+```
+
+- **The passphrase** is encoded like a vault password (§1) and must be at least 12 characters. The app suggests a random one of six groups of four characters (about 118 bits).
+- **Argon2id parameters** are the exporting vault's own. A reader checks them against the same limits as a vault's (m from 19 MiB to 4 GiB, t from 2 to 10, p from 1 to 16) **before** deriving any key, so a crafted header can't make the reader exhaust memory or time.
+- **The salt** is 32 random bytes, so every file has its own key.
+- **The manifest** is JSON with `"format": "offsechub-engagement"`, the app version and the engagement: its client, scope, targets with services, findings with retests, test cases, operator log, recon imports, and an `evidence` list giving each file's id, name, content type, size and SHA-256. Ids in the manifest are local to the file; links between records (a finding's targets, an evidence file's finding) use them.
+
+**Reading** rejects, without changing the vault:
+
+- a wrong magic, a chunk size other than 65536, or a version it doesn't know (it asks for a newer OffsecHub);
+- anything that fails authentication: a wrong passphrase, a changed byte, truncation, appended or reordered chunks;
+- a manifest longer than 64 MiB, or one that fails validation (every field has a type and a length limit);
+- an evidence file whose size or SHA-256 differs from the manifest, and any bytes after the last evidence file.
+
+Evidence is decrypted one chunk at a time into new vault blobs (§5), each under a fresh key, so plaintext never touches disk. If anything fails, the blobs written so far are deleted. Only when the whole file has been read are the records added, as a **new** engagement. The client is matched by name or created. If the engagement code is already taken, the import gets a free code instead.
+
+A hand-off file proves nothing about who made it: anyone with the passphrase can read or create one.
+
 ## Test vectors
 
 These are in `backend/tests/test_vault_vectors.py`. Independent cross-checks: Argon2id against the reference `argon2` CLI, HKDF against `openssl kdf`, and the keyslot and snapshot decryption against PyCryptodome with a hand-written RFC 5869 HKDF.
