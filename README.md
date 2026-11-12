@@ -1,6 +1,6 @@
 # OffsecHub
 
-**A local-first, encrypted workspace for penetration testers.** Scope, targets, recon imports, testing checklists, evidence, findings, operator logs and client-ready reports, all in **one encrypted vault on your own disk**. No server, no account, no network.
+**A local-first, encrypted workspace for penetration testers.** Scope, targets, recon imports, testing checklists, evidence, findings, operator logs and client-ready reports, all in **one encrypted vault on your own disk**. No server, no account, no network: the only request it ever makes is an update check, and only when you click it.
 
 **Website and downloads: [ajfan6t.github.io/offsechub](https://ajfan6t.github.io/offsechub/)**
 
@@ -18,13 +18,15 @@ Pentest data is a client's attack map. Multi-user platforms (PlexTrac, Dradis, G
 |---|---|
 | **Engagements** | Clients, engagements, testing windows, rules of engagement, status workflow, dashboard |
 | **Scope guard** | Include/exclude rules (IP, CIDR, range, host, `*.wildcard`, URL prefix). A scope checker. Every target shows live scope status. Imports never ingest excluded hosts. |
-| **Recon** | Import Nmap XML, nuclei JSON/JSONL and host lists; nuclei results become grouped draft findings; the raw output is kept as evidence |
+| **Recon** | Import Nmap XML, nuclei JSON/JSONL, Burp Suite issues (XML), Nessus (`.nessus`) and host lists. Scanner results become grouped draft findings, and the raw output is kept as evidence. |
 | **Testing** | OWASP WSTG, OWASP API Top 10, external, internal/AD and AWS checklists, per engagement or per target |
 | **Evidence** | Streamed straight into the vault, each file under its own key, with a SHA-256 fingerprint |
-| **Findings** | CVSS 3.1 calculator, CWE, draft → confirmed → remediated workflow, a reusable finding library |
-| **Reports** | Readiness checks, then print-ready HTML/PDF, Markdown or JSON, with an evidence-fingerprint appendix |
+| **Findings** | CVSS 3.1 and 4.0 calculators, CWE, formatted text (bold, lists, code blocks, links), draft → confirmed → remediated workflow, retest history, a reusable finding library |
+| **Reports** | Readiness checks, then PDF, Word, HTML, Markdown or JSON, with an evidence-fingerprint appendix. Your logo, accent colour, classification and footer. Word reports use the built-in template or [your own](docs/REPORT_TEMPLATES.md). |
+| **Ticketing** | Findings as CSV for Jira, SARIF 2.1.0, or DefectDojo's generic JSON |
+| **Hand-off** | Pass an engagement, evidence included, to a colleague as one passphrase-encrypted file; they import it into their own vault |
 | **Operator log** | Who ran what, from where, against what, with the outcome, for SOC deconfliction. Exports to CSV. |
-| **CLI** | `offsechub import ACME-EXT-26 scan.xml --tool nmap` pushes results into the running app |
+| **CLI** | `offsechub import ACME-EXT-26 scan.xml --tool nmap` pushes results into the running app (also `nuclei`, `burp`, `nessus` and `list` for host lists) |
 
 ## Screenshots
 
@@ -37,7 +39,7 @@ All taken from the real app running the sample engagement (`offsechub demo`).
 | ![Engagement overview](docs/screenshots/overview.png) | ![Scope rules](docs/screenshots/scope.png) |
 | **Overview**: scope, targets, findings by severity, test coverage and rules of engagement | **Scope**: include and exclude rules (CIDR, host, wildcard, URL) that imports respect |
 | ![Targets](docs/screenshots/targets.png) | ![Recon imports](docs/screenshots/recon.png) |
-| **Targets** with live scope status, open services and findings | **Recon**: Nmap, nuclei and host-list imports, also from the terminal |
+| **Targets** with live scope status, open services and findings | **Recon**: Nmap, nuclei, Burp Suite, Nessus and host-list imports, also from the terminal |
 | ![Testing checklists](docs/screenshots/testing.png) | ![Operator log](docs/screenshots/op-log.png) |
 | **Testing**: methodology checklists with coverage | **Operator log**: who ran what, from where, against what, for SOC deconfliction |
 
@@ -46,13 +48,13 @@ All taken from the real app running the sample engagement (`offsechub demo`).
 | | |
 |---|---|
 | ![Findings](docs/screenshots/findings.png) | ![Finding editor](docs/screenshots/finding-editor.png) |
-| **Findings** with CVSS scores and triage status | **Finding editor**: CVSS 3.1 calculator, affected assets, linked evidence |
+| **Findings** with CVSS scores and triage status | **Finding editor**: CVSS 3.1 or 4.0 calculator, affected assets, linked evidence, retests |
 | ![Evidence locker](docs/screenshots/evidence.png) | ![Finding library](docs/screenshots/library.png) |
 | **Evidence**: encrypted into the vault as it streams in, SHA-256 recorded | **Finding library**: reusable write-ups with CVSS and CWE |
 
 ![Report readiness checks and preview](docs/screenshots/report.png)
 
-**Report**: readiness checks, then a sandboxed preview of the client report (HTML/PDF, Markdown or JSON).
+**Report**: readiness checks and a sandboxed preview, then PDF, Word, HTML, Markdown or JSON, plus findings for Jira, SARIF and DefectDojo.
 
 ### The vault
 
@@ -61,7 +63,7 @@ All taken from the real app running the sample engagement (`offsechub demo`).
 | ![Vault picker](docs/screenshots/welcome.png) | ![Recovery key](docs/screenshots/recovery-key.png) |
 | **Vault picker**: recent vaults, open or create | **Recovery key**, shown once at creation, with a downloadable recovery kit |
 | ![Locked vault](docs/screenshots/locked.png) | ![Settings](docs/screenshots/settings.png) |
-| **Locked** after idle time or a lock from elsewhere, with an explanation | **Settings**: password, recovery key, rekey, auto-lock, encrypted backup, evidence verification |
+| **Locked** after idle time or a lock from elsewhere, with an explanation | **Settings**: report branding and Word templates, password, recovery key, rekey, auto-lock, encrypted backup, evidence verification, update check |
 
 ## Security at a glance
 
@@ -85,6 +87,8 @@ All taken from the real app running the sample engagement (`offsechub demo`).
 - **Local API hardening.** A one-time launch token, an exact Host allow-list against DNS rebinding, CSRF and Origin checks, and a strict CSP (no inline script, no `eval`).
 - **A three-function JS bridge.** pywebview's dispatcher walks dotted attribute paths from page script. OffsecHub replaces it with exact allow-listed names and rebuilds the bridge without `eval`, so it works under the CSP. All three functions open a native dialog the user has to confirm.
 - **Plaintext stays off disk.** In-memory SQLite with in-memory temp storage, streaming uploads (no multipart spooling), no access logs, and no core dumps.
+- **Untrusted inputs stay data.** Scanner HTML becomes plain text, finding text is a small Markdown subset that each report format escapes, Word templates render in a Jinja sandbox and are checked for zip bombs and XML entities, and CSV exports are defused against spreadsheet formulas.
+- **Hand-off files** are encrypted like the vault (Argon2id, AES-256-GCM STREAM) under a passphrase you send separately, and every byte is authenticated before anything is imported.
 - **No lock-in.** [`tools/ohvault_decrypt.py`](tools/ohvault_decrypt.py) is an independent decoder written only from the spec. It decrypts your vault without OffsecHub.
 
 What it does **not** protect against (for example, malware running as you while the vault is unlocked) is spelled out in the [threat model](docs/THREAT_MODEL.md#6-out-of-scope-stated-plainly).
@@ -142,6 +146,8 @@ Push tool output from a terminal while the app is running:
 nmap -sV -oX scan.xml 203.0.113.0/24
 offsechub import ACME-EXT-26 scan.xml --tool nmap
 nuclei -l hosts.txt -jsonl -o nuclei.jsonl && offsechub import ACME-EXT-26 nuclei.jsonl --tool nuclei
+offsechub import ACME-EXT-26 burp-issues.xml --tool burp       # Burp: select issues, right-click, Report selected issues > XML
+offsechub import ACME-EXT-26 external.nessus --tool nessus     # Nessus: Export > Nessus
 ```
 
 
@@ -177,3 +183,8 @@ docs/                      vault format, threat model, architecture, case study
 - [Architecture](docs/ARCHITECTURE.md): process model, concurrency and persistence, API contract, ADRs
 - [Case study](docs/CASE_STUDY.md): the pivot, design principles, and what adversarial review found
 - [Code signing](docs/CODE_SIGNING.md): signed and notarized releases, and how to set up the credentials
+- [Report templates](docs/REPORT_TEMPLATES.md): make your own Word report template
+
+## Licence
+
+OffsecHub is free software under the [MIT licence](LICENSE). The installers bundle third-party components under their own licences, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

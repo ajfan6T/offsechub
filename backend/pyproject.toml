@@ -1,6 +1,6 @@
 [project]
 name = "offsechub"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local-first, encrypted desktop workspace for penetration testing engagements: scope, targets, recon, testing, evidence, findings and reports."
 requires-python = ">=3.11"
 license = "MIT"

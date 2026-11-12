@@ -381,7 +381,7 @@ body.is-locked .scrambled { color: var(--muted); }
           <span>Download OffsecHub</span>
         </a>
         <a class="btn btn-ghost" href="https://github.com/ajfan6T/offsechub">Source on GitHub</a>
-        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+, Debian 12+, Ubuntu 24.04+, Kali</span>
+        <span class="cta-note" id="hero-note">Free and open source (MIT) · Windows 10+, macOS 11+, Debian 12+, Ubuntu 24.04+, Kali</span>
       </div>
     </div>
   </div>
@@ -456,11 +456,11 @@ Remediation: block /.git/ at the web server.</textarea>
   <ol class="track">
     <li><h3>Scope</h3><p>Include and exclude rules for IPs, CIDRs, hostnames, wildcards and URLs, plus a checker for "can I touch this?"</p></li>
     <li><h3>Targets</h3><p>Every host, service and URL with its live scope status.</p></li>
-    <li><h3>Recon</h3><p>Import Nmap XML, nuclei JSONL and host lists, from the app or your terminal. Excluded hosts never get in.</p></li>
+    <li><h3>Recon</h3><p>Import Nmap, nuclei, Burp Suite and Nessus results or host lists, from the app or your terminal. Excluded hosts never get in.</p></li>
     <li><h3>Testing</h3><p>OWASP WSTG, API Top 10, external, internal/AD and AWS checklists, and an operator log for SOC deconfliction.</p></li>
     <li><h3>Evidence</h3><p>Screenshots, requests and dumps, encrypted as they stream in, fingerprinted with SHA-256 and linked to findings.</p></li>
-    <li><h3>Findings</h3><p>CVSS 3.1 calculator, CWE, a triage workflow and a library of reusable write-ups.</p></li>
-    <li><h3>Report</h3><p>Readiness checks, then HTML (print to PDF), Markdown or JSON with an evidence appendix.</p></li>
+    <li><h3>Findings</h3><p>CVSS 3.1 and 4.0 calculators, CWE, formatted write-ups, retest tracking and a library of reusable findings.</p></li>
+    <li><h3>Report</h3><p>Readiness checks, then PDF or Word in your branding (or your own Word template), HTML, Markdown or JSON. Findings also export to Jira CSV, SARIF and DefectDojo.</p></li>
   </ol>
   <div class="showcase">
     <figure>
@@ -473,9 +473,9 @@ Remediation: block /.git/ at the web server.</textarea>
     <figure class="wide-only">
       <div class="frame">
         <div class="frame-bar"><span>OffsecHub · ACME-EXT-26</span><span>Finding</span></div>
-        <img src="screenshots/finding-editor.png" width="1440" height="900" alt="The finding editor with its CVSS 3.1 calculator, affected assets and linked evidence" loading="lazy">
+        <img src="screenshots/finding-editor.png" width="1440" height="900" alt="The finding editor with its CVSS 3.1 and 4.0 calculator, affected assets and linked evidence" loading="lazy">
       </div>
-      <figcaption>A finding: CVSS 3.1 calculator, affected assets and linked evidence.</figcaption>
+      <figcaption>A finding: CVSS 3.1 or 4.0 calculator, affected assets and linked evidence.</figcaption>
     </figure>
   </div>
 </section>
@@ -516,13 +516,13 @@ Remediation: block /.git/ at the web server.</textarea>
       <span class="ref" role="cell">OH-05</span>
       <div class="what" role="cell"><h3>Report day takes the whole day</h3><p class="impact">Copying findings between documents, re-scoring CVSS and hunting for the right screenshot.</p></div>
       <span class="sev" role="cell"><span class="chip sev-med">Medium</span></span>
-      <div class="fix" role="cell"><span class="chip">Fixed</span><p>A finding library, a CVSS calculator and readiness checks, then one click to HTML, PDF, Markdown or JSON.</p></div>
+      <div class="fix" role="cell"><span class="chip">Fixed</span><p>A finding library, CVSS calculators and readiness checks, then one click to PDF, Word, HTML, Markdown or JSON, with your logo and template.</p></div>
     </div>
     <div class="finding" role="row">
       <span class="ref" role="cell">OH-06</span>
       <div class="what" role="cell"><h3>No internet inside the client network</h3><p class="impact">Cloud tools stop working on an isolated test VLAN, a Kali VM without egress, or a plane.</p></div>
       <span class="sev" role="cell"><span class="chip sev-info">Info</span></span>
-      <div class="fix" role="cell"><span class="chip">Fixed</span><p>Everything works offline. No sign-in, no telemetry, no update checks.</p></div>
+      <div class="fix" role="cell"><span class="chip">Fixed</span><p>Everything works offline. No sign-in and no telemetry. It checks for updates only when you click the button.</p></div>
     </div>
   </div>
 </section>
@@ -547,7 +547,7 @@ Remediation: block /.git/ at the web server.</textarea>
     <div class="rules out">
       <div class="rules-head">Out of scope <span class="count">3</span></div>
       <dl>
-        <div class="rule"><dt>Several people editing one engagement live</dt><dd>OffsecHub is single-operator. Encrypted engagement export and import is on the roadmap.</dd></div>
+        <div class="rule"><dt>Several people editing one engagement live</dt><dd>OffsecHub is single-operator. To hand an engagement over, export it as one encrypted file that a colleague imports into their own vault.</dd></div>
         <div class="rule"><dt>SOC and incident response case management</dt><dd>It's built around offensive engagements: scope, targets, findings and a client report.</dd></div>
         <div class="rule"><dt>Scanning</dt><dd>OffsecHub imports what your tools find. It doesn't scan anything itself.</dd></div>
       </dl>
@@ -591,7 +591,7 @@ Remediation: block /.git/ at the web server.</textarea>
       </li>
       <li class="step" tabindex="0" data-shot="report.png" data-caption="Readiness checks next to a live preview of the client report.">
         <h3>Write the report</h3>
-        <p>Fix what the readiness check flags, then export HTML (print it to PDF), Markdown or JSON.</p>
+        <p>Fix what the readiness check flags, then export PDF, Word, HTML, Markdown or JSON.</p>
         <img src="screenshots/report.png" width="1440" height="900" alt="Report readiness checks and preview" loading="lazy">
       </li>
     </ol>
@@ -720,6 +720,7 @@ Remediation: block /.git/ at the web server.</textarea>
     <a href="https://github.com/ajfan6T/offsechub">GitHub</a>
     <a href="https://github.com/ajfan6T/offsechub/releases">Releases</a>
     <a href="https://github.com/ajfan6T/offsechub/blob/HEAD/docs/CASE_STUDY.md">Case study</a>
+    <a href="https://github.com/ajfan6T/offsechub/blob/HEAD/LICENSE">MIT licence</a>
   </span>
   <span>This page loads nothing from other sites, except GitHub's API for the latest version and file sizes.</span>
 </footer>
@@ -922,7 +923,7 @@ Remediation: block /.git/ at the web server.</textarea>
       tag.innerHTML = `Latest: <b></b>${date ? ` · ${date}` : ""}`;
       tag.querySelector("b").textContent = release.tag_name;
       meta.replaceChild(tag, meta.firstElementChild);
-      $("#hero-note").textContent = `Free · ${release.tag_name} · Windows, macOS, Debian 12+, Ubuntu 24.04+, Kali`;
+      $("#hero-note").textContent = `Free and open source (MIT) · ${release.tag_name} · Windows, macOS, Debian 12+, Ubuntu 24.04+, Kali`;
       for (const row of $$(".asset")) {
         const asset = (release.assets || []).find((a) => a.name === row.dataset.asset);
         if (!asset) {
