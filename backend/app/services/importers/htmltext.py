@@ -123,7 +123,10 @@ def _escape(text: str, prev: str, more: bool) -> str:
         before = text[m.start() - 1] if m.start() else prev
         after = text[m.end()] if m.end() < len(text) else ""
         could_open = before == "" or before.isspace() or before in _OPEN_BEFORE
-        if len(m.group()) <= 2 and could_open and (after.isalnum() or (not after and more)):
+        # Same rule as richtext: one marker opens before a letter or digit, two before any non-space.
+        opens_next = after.isalnum() if len(m.group()) == 1 else (
+            after != "" and not after.isspace() and after not in "*_")
+        if len(m.group()) <= 2 and could_open and (opens_next or (not after and more)):
             out.append(text[pos:m.start()] + "\\")
             pos = m.start()
     out.append(text[pos:])
