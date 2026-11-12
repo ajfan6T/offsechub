@@ -97,7 +97,8 @@ Installers for each release are on the [Releases page](https://github.com/ajfan6
 |---|---|---|
 | Windows 10 or 11, x64 | `offsechub-setup-<version>.exe` | Run it. It installs for your user without administrator rights (or for all users, if you choose), adds a Start menu entry and an uninstaller, and installs the Microsoft WebView2 Runtime if it is missing. Optionally adds a desktop icon and puts `offsechub-cli` on your PATH. |
 | macOS 11 or later, Apple silicon | `OffsecHub-<version>-macOS-arm64.dmg` | Open it and drag OffsecHub to Applications. |
-| Debian 12+, Ubuntu 24.04+, Kali and derivatives, x64 | `offsechub_<version>_amd64.deb` | `sudo apt install ./offsechub_<version>_amd64.deb` (pulls in WebKitGTK and PyGObject from your distribution). |
+| macOS 11 or later, Intel | `OffsecHub-<version>-macOS-x86_64.dmg` | Open it and drag OffsecHub to Applications. |
+| Debian 12+, Ubuntu 24.04+, Kali and derivatives, x64 or arm64 | `offsechub_<version>_amd64.deb` (x64)<br>`offsechub_<version>_arm64.deb` (arm64) | `sudo apt install ./offsechub_<version>_amd64.deb`, or `_arm64.deb` (pulls in WebKitGTK and PyGObject from your distribution). |
 
 The `.deb` runs on your distribution's own Python (3.11 to 3.14) and WebKitGTK 4.1. Older releases such as Ubuntu 22.04 (Python 3.10) or Debian 11 (Python 3.9) can't install it; use [Run from source](#run-from-source) with Python 3.11 or later instead.
 

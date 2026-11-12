@@ -381,7 +381,7 @@ body.is-locked .scrambled { color: var(--muted); }
           <span>Download OffsecHub</span>
         </a>
         <a class="btn btn-ghost" href="https://github.com/ajfan6T/offsechub">Source on GitHub</a>
-        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+ (Apple silicon), Debian 12+, Ubuntu 24.04+, Kali</span>
+        <span class="cta-note" id="hero-note">Free · Windows 10+, macOS 11+, Debian 12+, Ubuntu 24.04+, Kali</span>
       </div>
     </div>
   </div>
@@ -621,19 +621,33 @@ Remediation: block /.git/ at the web server.</textarea>
       <span class="plat">Windows <span class="yours chip">your system</span><span class="plat-sub">Windows 10 or 11, 64-bit</span></span>
       <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/offsechub-setup.exe">Download .exe</a>
     </div>
-    <div class="asset" data-os="mac" data-asset="OffsecHub-macOS-arm64.dmg">
+    <div class="asset" data-os="mac" data-arch="arm" data-asset="OffsecHub-macOS-arm64.dmg">
       <span class="perm" aria-hidden="true">-rw-r--r--</span>
       <span class="size">≈ 26 MB</span>
       <span class="name">OffsecHub-macOS-arm64.dmg<small class="digest"></small></span>
       <span class="plat">macOS <span class="yours chip">your system</span><span class="plat-sub">macOS 11 or later, Apple silicon</span></span>
       <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/OffsecHub-macOS-arm64.dmg">Download .dmg</a>
     </div>
-    <div class="asset" data-os="linux" data-asset="offsechub_amd64.deb">
+    <div class="asset" data-os="mac" data-arch="x86" data-asset="OffsecHub-macOS-x86_64.dmg">
+      <span class="perm" aria-hidden="true">-rw-r--r--</span>
+      <span class="size">≈ 26 MB</span>
+      <span class="name">OffsecHub-macOS-x86_64.dmg<small class="digest"></small></span>
+      <span class="plat">macOS <span class="yours chip">your system</span><span class="plat-sub">macOS 11 or later, Intel</span></span>
+      <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/OffsecHub-macOS-x86_64.dmg">Download .dmg</a>
+    </div>
+    <div class="asset" data-os="linux" data-arch="x86" data-asset="offsechub_amd64.deb">
       <span class="perm" aria-hidden="true">-rw-r--r--</span>
       <span class="size">≈ 29 MB</span>
       <span class="name">offsechub_amd64.deb<small class="digest"></small></span>
-      <span class="plat">Linux <span class="yours chip">your system</span><span class="plat-sub">Debian 12+, Ubuntu 24.04+, Kali, 64-bit</span></span>
+      <span class="plat">Linux <span class="yours chip">your system</span><span class="plat-sub">Debian 12+, Ubuntu 24.04+, Kali, x64</span></span>
       <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/offsechub_amd64.deb">Download .deb</a>
+    </div>
+    <div class="asset" data-os="linux" data-arch="arm" data-asset="offsechub_arm64.deb">
+      <span class="perm" aria-hidden="true">-rw-r--r--</span>
+      <span class="size">≈ 29 MB</span>
+      <span class="name">offsechub_arm64.deb<small class="digest"></small></span>
+      <span class="plat">Linux <span class="yours chip">your system</span><span class="plat-sub">Debian 12+, Ubuntu 24.04+, Kali, arm64</span></span>
+      <a class="btn btn-primary" href="https://github.com/ajfan6T/offsechub/releases/latest/download/offsechub_arm64.deb">Download .deb</a>
     </div>
   </div>
   <p class="no-release" id="no-release" hidden>No release has been published yet, so these links don't work today. Until the first release, build OffsecHub from source with the steps in the <a href="https://github.com/ajfan6T/offsechub#run-from-source">README</a>.</p>
@@ -650,9 +664,10 @@ Remediation: block /.git/ at the web server.</textarea>
     <article>
       <h3>macOS</h3>
       <ol>
-        <li>Open the <code>.dmg</code> and drag OffsecHub to Applications.</li>
+        <li>Open the <code>.dmg</code> for your Mac and drag OffsecHub to Applications.</li>
         <li>Open it from Applications.</li>
       </ol>
+      <p class="note">Apple silicon or Intel? In the Apple menu, choose About This Mac: a Chip line (Apple M1 or later) means Apple silicon, a Processor line means Intel.</p>
       <p class="note">If macOS blocks the first launch, open System Settings, Privacy &amp; Security, and click Open Anyway.</p>
     </article>
     <article>
@@ -660,8 +675,8 @@ Remediation: block /.git/ at the web server.</textarea>
       <ol>
         <li>Install the package; apt pulls in WebKitGTK from your distribution.</li>
       </ol>
-      <div class="code"><span class="prompt">$ </span>sudo apt install ./offsechub_amd64.deb<button class="copy" type="button" data-copy="sudo apt install ./offsechub_amd64.deb">Copy</button></div>
-      <p class="note">Then start OffsecHub from your app menu, or run <code>offsechub</code>.</p>
+      <div class="code" id="deb-install"><span class="prompt">$ </span><span class="cmd">sudo apt install ./offsechub_amd64.deb</span><button class="copy" type="button" data-copy="sudo apt install ./offsechub_amd64.deb">Copy</button></div>
+      <p class="note">On 64-bit ARM (arm64), install <code>offsechub_arm64.deb</code> instead. Then start OffsecHub from your app menu, or run <code>offsechub</code>.</p>
       <p class="note">Needs Debian 12, Ubuntu 24.04 or current Kali, or newer. Older releases such as Ubuntu 22.04 ship a Python that is too old for the package: <a href="https://github.com/ajfan6T/offsechub#run-from-source">run from source</a> with Python 3.11 or later instead.</p>
     </article>
   </div>
@@ -670,9 +685,9 @@ Remediation: block /.git/ at the web server.</textarea>
     <p>Check a download against the release's checksums before you run it:</p>
     <div class="code"><span class="prompt">$ </span>curl -LO https://github.com/ajfan6T/offsechub/releases/latest/download/SHA256SUMS
 <span class="prompt">$ </span>sha256sum --check --ignore-missing SHA256SUMS<button class="copy" type="button" data-copy="curl -LO https://github.com/ajfan6T/offsechub/releases/latest/download/SHA256SUMS && sha256sum --check --ignore-missing SHA256SUMS">Copy</button></div>
-    <p>On macOS use <code>shasum -a 256 OffsecHub-macOS-arm64.dmg</code>; on Windows, <code>Get-FileHash .\offsechub-setup.exe</code>, and compare with the file.</p>
+    <p>On macOS use <code>shasum -a 256 OffsecHub-macOS-*.dmg</code>; on Windows, <code>Get-FileHash .\offsechub-setup.exe</code>, and compare with the file.</p>
   </div>
-  <p class="other">Fedora, Arch or an Intel Mac? <a href="https://github.com/ajfan6T/offsechub#run-from-source">Run OffsecHub from source</a> with Python 3.11 and Node 20.</p>
+  <p class="other">Fedora, Arch or another system? <a href="https://github.com/ajfan6T/offsechub#run-from-source">Run OffsecHub from source</a> with Python 3.11 and Node 20.</p>
 </section>
 
 <section id="security" aria-labelledby="security-title">
@@ -836,41 +851,70 @@ Remediation: block /.git/ at the web server.</textarea>
   }
 
   // ------------------------------------------------------------ downloads
-  function detectOS() {
-    const p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  // The visitor's system and CPU: User-Agent Client Hints where the browser has them
+  // (Chromium), else navigator.platform and the user agent, which name aarch64/arm64
+  // on Linux. Safari and Firefox call every Mac "Intel", so a Mac whose architecture
+  // is unknown gets Apple silicon as the pick, and both Mac rows stay highlighted.
+  async function detectSystem() {
     const ua = navigator.userAgent || "";
     if (/android|iphone|ipad|ipod/i.test(ua)) return null;
-    if (/win/i.test(p)) return "windows";
-    if (/mac/i.test(p)) return "mac";
-    if (/linux/i.test(p)) return "linux";
-    return null;
+    const uad = navigator.userAgentData;
+    let p = (uad && uad.platform) || navigator.platform || "";
+    let arch = "";
+    if (uad && uad.getHighEntropyValues) {
+      try {
+        const hints = await uad.getHighEntropyValues(["architecture", "platform"]);
+        p = hints.platform || p;
+        arch = hints.architecture || "";  // "arm" or "x86"
+      } catch { /* hints withheld: the platform alone */ }
+    }
+    const os = /win/i.test(p) ? "windows" : /mac/i.test(p) ? "mac" : /linux/i.test(p) ? "linux" : null;
+    if (os === "linux" && !arch) {
+      const s = `${navigator.platform || ""} ${ua}`;
+      arch = /aarch64|arm64/i.test(s) ? "arm" : /x86_64|amd64/i.test(s) ? "x86" : "";
+    }
+    return os && { os, arch };
   }
-  const os = detectOS();
   const LABEL = { windows: "Download for Windows", mac: "Download for macOS", linux: "Download for Linux" };
-  if (os) {
-    const row = $(`.asset[data-os="${os}"]`);
-    row.classList.add("is-yours");
+  let heroRow = null;
+  function pick(system) {
+    if (!system) return;
+    // The rows for this system and CPU; with the CPU unknown, all of the system's
+    // rows, and the first (Apple silicon, x64) is the hero's pick.
+    const rows = $$(`.asset[data-os="${system.os}"]`);
+    const exact = rows.filter((row) => row.dataset.arch === system.arch);
+    const yours = exact.length ? exact : rows;
+    yours.forEach((row) => row.classList.add("is-yours"));
     // One obvious action: the other systems' buttons step back.
     $$(".asset:not(.is-yours) .btn").forEach((b) => b.classList.replace("btn-primary", "btn-ghost"));
-    const link = $("a.btn", row).getAttribute("href");
-    $("#hero-download").setAttribute("href", link);
-    $("#hero-download span").textContent = LABEL[os];
+    heroRow = yours[0];
+    $("#hero-download").setAttribute("href", $("a.btn", heroRow).getAttribute("href"));
+    $("#hero-download span").textContent = LABEL[system.os];
+    if (system.os === "linux" && exact.length) {
+      const cmd = `sudo apt install ./${heroRow.dataset.asset}`;
+      $("#deb-install .cmd").textContent = cmd;
+      $("#deb-install .copy").dataset.copy = cmd;
+    }
   }
+  function heroToListing() {
+    $("#hero-download").setAttribute("href", "#download");
+    $("#hero-download span").textContent = "Download OffsecHub";
+  }
+  const picked = detectSystem().catch(() => null).then(pick);
 
   function fmtSize(bytes) {
     return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
   }
-  fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } })
-    .then((r) => {
-      if (r.status === 404) {
+  const latest = fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } })
+    .then((r) => (r.status === 404 ? false : r.ok ? r.json() : null));
+  // After the pick, so a missing release or file can take the hero's link back.
+  Promise.all([latest, picked])
+    .then(([release]) => {
+      if (release === false) {
         $("#no-release").hidden = false;
-        $("#hero-download").setAttribute("href", "#download");
-        $("#hero-download span").textContent = "Download OffsecHub";
-        return null;
+        heroToListing();
+        return;
       }
-      return r.ok ? r.json() : null;
-    })
-    .then((release) => {
       if (!release) return;
       const date = (release.published_at || "").slice(0, 10);
       const meta = $("#release-meta");
@@ -878,10 +922,21 @@ Remediation: block /.git/ at the web server.</textarea>
       tag.innerHTML = `Latest: <b></b>${date ? ` · ${date}` : ""}`;
       tag.querySelector("b").textContent = release.tag_name;
       meta.replaceChild(tag, meta.firstElementChild);
-      $("#hero-note").textContent = `Free · ${release.tag_name} · Windows, macOS (Apple silicon), Debian 12+, Ubuntu 24.04+, Kali`;
+      $("#hero-note").textContent = `Free · ${release.tag_name} · Windows, macOS, Debian 12+, Ubuntu 24.04+, Kali`;
       for (const row of $$(".asset")) {
         const asset = (release.assets || []).find((a) => a.name === row.dataset.asset);
-        if (!asset) continue;
+        if (!asset) {
+          if (!(release.assets || []).length) continue;
+          // A platform added after this release: no direct link until the next one.
+          $(".size", row).textContent = "–";
+          $(".digest", row).textContent = `not in ${release.tag_name} yet`;
+          const btn = $("a.btn", row);
+          btn.classList.replace("btn-primary", "btn-ghost");
+          btn.setAttribute("href", `https://github.com/${REPO}/releases`);
+          btn.textContent = "All releases";
+          if (row === heroRow) heroToListing();
+          continue;
+        }
         $(".size", row).textContent = fmtSize(asset.size);
         if (asset.digest) {
           const d = asset.digest.replace(/^sha256:/, "");
