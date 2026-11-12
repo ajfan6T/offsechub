@@ -156,7 +156,7 @@ function TemplateForm({ template, onClose }: { template: FindingTemplate | null;
         <Field label="CWE">
           <input className="mono" value={form.cwe} onChange={set("cwe")} placeholder="CWE-79" />
         </Field>
-        <Field label="CVSS v3.1" wide>
+        <Field label="CVSS base score" wide>
           <CvssBuilder value={form.cvss_vector} onChange={(v) => setForm((f) => ({ ...f, cvss_vector: v }))} />
         </Field>
         <Field label="Description" wide>
