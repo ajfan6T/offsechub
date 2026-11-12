@@ -35,9 +35,9 @@ export function setApiEvents(handlers: Partial<ApiEvents>) {
   events = handlers;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
   // The custom header is required by the backend's CSRF protection.
-  const headers: Record<string, string> = { "X-Requested-With": "OffsecHub" };
+  const headers: Record<string, string> = { ...extraHeaders, "X-Requested-With": "OffsecHub" };
   let payload: BodyInit | undefined;
   if (body instanceof Blob) {
     // Raw request body: the backend streams it straight into the vault's encryptor.
@@ -75,8 +75,8 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body ?? {}),
   del: (path: string) => request<void>("DELETE", path),
   /** Upload one file as the raw request body; metadata travels in the query string. */
-  upload: <T>(path: string, file: File, params: Params = {}) =>
-    request<T>("POST", `${path}${qs({ filename: file.name, ...params })}`, file),
+  upload: <T>(path: string, file: File, params: Params = {}, headers: Record<string, string> = {}) =>
+    request<T>("POST", `${path}${qs({ filename: file.name, ...params })}`, file, headers),
 };
 
 export function qs(params: Params): string {

@@ -1,3 +1,4 @@
+import { HandoffImportButton } from "../components/Handoff";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -36,9 +37,12 @@ export function Engagements() {
         title="Engagements"
         subtitle="Every assessment is a case: scope, targets, testing, evidence, findings and the report."
         actions={
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            New engagement
-          </Button>
+          <>
+            <HandoffImportButton />
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              New engagement
+            </Button>
+          </>
         }
       />
       <div className="toolbar">

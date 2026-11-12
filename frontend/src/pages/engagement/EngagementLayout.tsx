@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, Outlet, useParams } from "react-router";
 import { api } from "../../api";
+import { HandoffExportButton } from "../../components/Handoff";
 import { ErrorBox, Loading, StatusPill } from "../../components/ui";
 import { daysUntil, ENGAGEMENT_TYPES, fmtDate } from "../../lib/format";
 import type { Engagement } from "../../types";
@@ -39,6 +40,7 @@ export function EngagementLayout() {
         <div className="eng-title">
           <h1>{e.name}</h1>
           <StatusPill status={e.status} />
+          <div className="eng-actions"><HandoffExportButton base={base} code={e.code} /></div>
         </div>
         <div className="muted">
           {e.client.name} · {ENGAGEMENT_TYPES[e.type]} · {fmtDate(e.start_date)} to {fmtDate(e.end_date)}

@@ -19,6 +19,7 @@ from .api import (
     evidence,
     exports,
     findings,
+    handoff,
     recon,
     report_settings,
     reports,
@@ -115,7 +116,7 @@ def create_app(
         return response
 
     for module in (vault, clients, engagements, scope, targets, recon, testing, evidence,
-                   findings, reports, report_settings, exports, activity):
+                   findings, reports, report_settings, exports, handoff, activity):
         app.include_router(module.router)
 
     @app.get("/api/health", tags=["meta"])

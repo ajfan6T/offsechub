@@ -449,3 +449,7 @@ button.thumb, .thumb-btn { cursor: zoom-in; }
 .row { display: flex; gap: 8px; align-items: center; }
 .row > input:not([type="color"]) { flex: 1; min-width: 0; }
 .subhead { margin: 18px 0 8px; font-size: 13px; }
+
+/* Hand-off */
+.eng-actions { margin-left: auto; }
+.passphrase { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px; font-size: 15px; letter-spacing: 0.04em; }
