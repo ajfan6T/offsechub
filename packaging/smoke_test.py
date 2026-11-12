@@ -13,7 +13,9 @@ the user's settings. Checks, in order:
    serves the UI;
 3. the local API unlocks the demo vault and renders a report (templates), and
    DOCX and PDF reports where the app offers them (python-docx, ReportLab,
-   lxml, Pillow and the bundled fonts in the installed build);
+   lxml, Pillow and the bundled fonts in the installed build), and a DOCX from
+   an uploaded template, which renders in a child process (multiprocessing in
+   the frozen app);
 4. the window is still alive a few seconds later (the GUI toolkit loaded);
 5. a normal shutdown (SIGTERM, or closing the window on Windows) saves, locks
    and removes runtime.json.
@@ -54,11 +56,14 @@ def ok(message: str) -> None:
     print(f"PASS {message}", flush=True)
 
 
-def call(port: int, token: str, method: str, path: str, body: dict | None = None):
-    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
+def call(port: int, token: str, method: str, path: str, body: dict | bytes | None = None):
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=180)
     headers = {"Authorization": f"Bearer {token}"}
     data = None
-    if body is not None:
+    if isinstance(body, bytes):
+        data = body
+        headers["Content-Type"] = "application/octet-stream"
+    elif body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
     conn.request(method, path, body=data, headers=headers)
@@ -136,6 +141,24 @@ def main() -> None:
         if status != 200 or not body.startswith(magic):
             fail(f"{fmt} report: HTTP {status}: {body[:300]!r}", proc)
         ok(f"{fmt} report rendered ({len(body)} bytes)")
+
+    # A user's Word template renders in a child process: the frozen app must be able to start one.
+    status, template = call(port, token, "GET", "/api/report-templates/builtin/download")
+    if status == 404:
+        print("SKIP Word template upload: not offered by this version", flush=True)
+    else:
+        if status != 200 or not template.startswith(b"PK\x03\x04"):
+            fail(f"built-in template download: HTTP {status}", proc)
+        status, body = call(port, token, "POST", "/api/report-templates/upload?filename=smoke.docx&name=Smoke",
+                            template)
+        if status != 201:
+            fail(f"template upload: HTTP {status}: {body[:300]!r}", proc)
+        template_id = json.loads(body)["id"]
+        status, body = call(port, token, "GET",
+                            f"/api/engagements/{engagements[0]['id']}/report?format=docx&template_id={template_id}")
+        if status != 200 or not body.startswith(b"PK\x03\x04"):
+            fail(f"docx report from an uploaded template: HTTP {status}: {body[:300]!r}", proc)
+        ok(f"docx report from an uploaded template rendered in a child process ({len(body)} bytes)")
 
     time.sleep(5)
     if proc.poll() is not None:

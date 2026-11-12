@@ -38,10 +38,42 @@ def test_retests_track_the_fix(api, engagement):
     assert any("Retested" in a["summary"] and "remediated" in a["summary"] for a in activity)
 
 
-def test_retest_does_not_reopen_or_override_other_statuses(api, engagement):
+def test_retest_leaves_other_statuses_alone(api, engagement):
     f = api.ok("POST", _findings(engagement), json={"title": "Accepted risk", "status": "risk_accepted"})
-    api.ok("POST", f"{_findings(engagement)}/{f['id']}/retests", json={"result": "resolved"})
+    url = f"{_findings(engagement)}/{f['id']}/retests"
+    api.ok("POST", url, json={"result": "resolved"})
+    api.ok("POST", url, json={"result": "not_resolved"})
     assert api.ok("GET", f"{_findings(engagement)}/{f['id']}")["status"] == "risk_accepted"
+
+
+def test_status_follows_the_latest_retest_by_date(api, engagement):
+    f = api.ok("POST", _findings(engagement), json={"title": "Weak TLS", "status": "reported"})
+    url = f"{_findings(engagement)}/{f['id']}/retests"
+    get = lambda: api.ok("GET", f"{_findings(engagement)}/{f['id']}")  # noqa: E731
+
+    failed = api.ok("POST", url, json={"tested_on": "2026-10-10", "result": "not_resolved"})
+    # A resolved retest dated earlier is history, not the current state.
+    early = api.ok("POST", url, json={"tested_on": "2026-10-01", "result": "resolved"})
+    assert (get()["status"], get()["retest_status"]) == ("reported", "not_resolved")
+
+    # Removing the later failure makes the resolved retest the latest one.
+    api.ok("DELETE", f"{url}/{failed['id']}")
+    assert (get()["status"], get()["retest_status"]) == ("remediated", "resolved")
+
+    # A later failed retest reopens a remediated finding.
+    api.ok("POST", url, json={"tested_on": "2026-10-20", "result": "partially_resolved"})
+    assert (get()["status"], get()["retest_status"]) == ("reported", "partially_resolved")
+    activity = api.ok("GET", f"/api/engagements/{engagement['id']}/activity")
+    assert any("remediated -> reported" in a["summary"] for a in activity)
+
+    # Same date: the one recorded last counts.
+    api.ok("POST", url, json={"tested_on": "2026-10-20", "result": "resolved"})
+    assert get()["status"] == "remediated"
+    # Removing every retest leaves the status as it is.
+    for r in get()["retests"]:
+        api.ok("DELETE", f"{url}/{r['id']}")
+    assert get()["status"] == "remediated" and get()["retest_status"] is None
+    assert early["result"] == "resolved"
 
 
 def test_retest_validation_and_scoping(api, engagement):

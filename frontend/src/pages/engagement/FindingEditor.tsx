@@ -265,6 +265,9 @@ function RetestPanel({ finding }: { finding: Finding }) {
   const today = new Date().toISOString().slice(0, 10);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ tested_on: today, result: "resolved" as RetestResult, notes: "" });
+  // The status follows the latest retest (by date; on the same date, the newest entry).
+  const lastDate = finding.retests.length ? finding.retests[finding.retests.length - 1].tested_on : "";
+  const latest = form.tested_on >= lastDate;
   const invalidate = [[base, "findings"], [base, "finding", String(finding.id)], [base, "summary"], [base]];
   const add = useApiMutation(() => api.post<Retest>(`${base}/findings/${finding.id}/retests`, form), {
     invalidate,
@@ -304,9 +307,13 @@ function RetestPanel({ finding }: { finding: Finding }) {
             </select>
           </Field>
           <RichField label="Notes" rows={3} value={form.notes} onChange={(notes) => setForm({ ...form, notes })} placeholder="What you checked and what you saw" />
-          {form.result === "resolved" && (finding.status === "confirmed" || finding.status === "reported") && (
+          {latest && form.result === "resolved" && (finding.status === "confirmed" || finding.status === "reported") && (
             <p className="muted small">The finding will be marked remediated.</p>
           )}
+          {latest && form.result !== "resolved" && finding.status === "remediated" && (
+            <p className="muted small">The finding will be reopened as reported.</p>
+          )}
+          {!latest && <p className="muted small">An earlier retest than the latest one: the status won't change.</p>}
           <div className="actions">
             <Button size="sm" variant="primary" disabled={!form.tested_on} loading={add.isPending} onClick={() => add.mutate(undefined)}>Record retest</Button>
             <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>

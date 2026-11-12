@@ -176,3 +176,79 @@ def test_pdf_report_through_the_api(api, report_setup):
     assert "Exposed Git repository <b>" in text
     assert "<script>alert(1)</script>" in text
     assert "Not resolved" in text and "CVSS v3.1" in text
+
+
+def _render_with(api, report_setup, body):
+    r = api.post("/api/report-templates/upload?filename=t.docx&name=t", content=_template_bytes(body),
+                 headers={"Content-Type": "application/octet-stream"})
+    assert r.status_code == 201, r.text
+    return api.get(f"{report_setup}/report?format=docx&template_id={r.json()['id']}")
+
+
+def test_templates_cannot_reach_the_document_objects(api, report_setup, tmp_path):
+    # InlineImage.tpl is the live DocxTemplate: save() would write anywhere on disk.
+    api.ok("POST", "/api/report-branding/logo", content=_png(), headers={"Content-Type": "image/png"})
+    target = tmp_path / "written.docx"
+    for body in (
+        "{% for f in findings %}{% for i in f.images %}{{ i.inline.tpl.save('" + str(target) + "') }}{% endfor %}{% endfor %}",
+        "{{ logo.tpl.save('" + str(target) + "') }}",
+        "{{ logo['tpl'].docx }}",
+        "{{ logo|attr('tpl')|attr('docx') }}",
+        "{{ ((findings|first).rt.description|attr('xml')).strip() }}",
+        "{{ rt.executive_summary.__class__.__mro__ }}",
+    ):
+        out = _render_with(api, report_setup, body)
+        assert out.status_code == 422 and "unsafe" in out.json()["detail"], (body, out.text)
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("body", [
+    "{{ 'A'.center(1500000000) }}",
+    "{{ 'x'.ljust(500000000) }}",
+    "{{ 'A'|center(10**9) }}",
+    "{{ '%0500000000d' % 1 }}",
+    "{{ '%0500000000d'|format(1) }}",
+    "{{ ((10**100)**100)**100 }}",
+    "{{ ''|indent(1000000000) }}",
+])
+def test_template_blow_ups_are_refused(api, report_setup, body):
+    out = _render_with(api, report_setup, body)
+    assert out.status_code == 422 and "could not be rendered" in out.json()["detail"], out.text
+
+
+def test_a_template_that_runs_too_long_is_stopped(api, report_setup, monkeypatch):
+    import app.services.report_docx as report_docx
+
+    monkeypatch.setattr(report_docx, "RENDER_TIMEOUT_S", 3)
+    body = "{% for i in range(100000) %}{% for j in range(100000) %}{% endfor %}{% endfor %}"
+    out = _render_with(api, report_setup, body)
+    assert out.status_code == 422 and "longer than 3 seconds" in out.json()["detail"], out.text
+    # The app is unaffected and keeps rendering.
+    assert api.get(f"{report_setup}/report?format=docx").status_code == 200
+
+
+def test_declarations_are_found_in_any_part_and_encoding():
+    def docx_with(name, data):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("word/document.xml", "<x/>")
+            zf.writestr(name, data)
+        return buf.getvalue()
+
+    declaration = '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e "e">]><x>&e;</x>'
+    for name, data in (("word/header1.XML", declaration.encode()),
+                       ("customXml/item1", declaration.encode()),
+                       ("word/footer1.xml", "﻿".encode("utf-16-le") + declaration.encode("utf-16-le"))):
+        with pytest.raises(TemplateProblem, match="not allowed"):
+            check_template(docx_with(name, data))
+    # Pictures are never parsed as XML, so an SVG's DOCTYPE there is fine (the file is then
+    # refused for other reasons, being no real template, but not for the declaration).
+    with pytest.raises(TemplateProblem) as exc:
+        check_template(docx_with("word/media/image1.svg", declaration.encode()))
+    assert "not allowed" not in str(exc.value)
+
+
+def test_control_characters_in_branding_never_reach_word(api, report_setup):
+    api.ok("PUT", "/api/report-branding", json={"organization": "Example\x07 Security\x0b Ltd"})
+    text = _text(_docx(api, f"{report_setup}/report?format=docx"))
+    assert "Example Security Ltd" in text and "\x07" not in text

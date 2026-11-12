@@ -5,9 +5,14 @@ come from anywhere (a colleague, a download), so it is handled as untrusted:
 
 * it is checked on upload and again before rendering (size, a bounded zip, no
   DTDs or entity declarations in its XML, valid template syntax);
-* it renders in a Jinja sandbox with autoescaping, so it can read the report
-  context but not reach Python internals, and context text cannot inject XML;
-* oversized repetition (``"x" * 10**9``) and huge powers are refused.
+* it renders in a Jinja sandbox with autoescaping. Attributes can be read only
+  on plain values (strings, numbers, lists, dicts) and Jinja's own helpers, so
+  the Word objects in the context (pictures, formatted text, which hold the
+  live document) stay opaque. Context text cannot inject XML;
+* it renders in a separate process, stopped after RENDER_TIMEOUT_S (and, on
+  Linux, limited in memory), so a template that loops or allocates without end
+  cannot hang or crash the app. Obvious blow-ups (``"x" * 10**9``, huge powers,
+  widths such as ``"x".center(10**9)``) are refused outright.
 
 Rich text (finding fields) becomes real Word paragraphs: body text, "List
 Bullet" items, "OH Numbered" items, "OH Code" blocks and "Heading 4"
@@ -18,7 +23,9 @@ that lacks one falls back to Word's default paragraph style.
 from __future__ import annotations
 
 import io
+import multiprocessing
 import re
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -26,6 +33,7 @@ from typing import Any
 from docx.shared import Mm, RGBColor
 from docxtpl import DocxTemplate, InlineImage, RichText, RichTextParagraph
 from jinja2 import TemplateError as JinjaTemplateError
+from jinja2.filters import do_center, do_format, do_indent
 from jinja2.sandbox import SandboxedEnvironment, SecurityError
 from PIL import Image, UnidentifiedImageError
 
@@ -36,11 +44,17 @@ BUILTIN = Path(__file__).resolve().parent.parent / "templates" / "report.docx"
 MAX_ZIP_ENTRIES = 1000
 MAX_UNZIPPED_BYTES = 64 * 1024 * 1024
 MAX_REPEAT = 10_000
+MAX_WIDTH = 10_000  # str.center/ljust/rjust/zfill/expandtabs and %-format widths
+RENDER_TIMEOUT_S = 120
+MAX_OUTPUT_BYTES = 512 * 1024 * 1024
+CHILD_MEMORY_BYTES = 4 * 1024 * 1024 * 1024  # Linux only (RLIMIT_AS)
 IMAGE_WIDTH_MM = 160
 IMAGE_MAX_HEIGHT_MM = 200
 SEVERITY_FILL = {"critical": "7F1D1D", "high": "DC2626", "medium": "EA580C", "low": "CA8A04", "info": "2563EB"}
 RETEST_LABELS = {"resolved": "Resolved", "partially_resolved": "Partially resolved",
                  "not_resolved": "Not resolved"}
+_XML_DECLARATIONS = tuple(m.encode(enc) for m in ("<!DOCTYPE", "<!ENTITY")
+                          for enc in ("utf-8", "utf-16-le", "utf-16-be"))
 # XML 1.0 forbids these; scanner output and pasted text sometimes contain them.
 _XML_INVALID = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
@@ -49,22 +63,69 @@ class TemplateProblem(ValueError):
     """The file is not a usable report template (message is shown to the user)."""
 
 
+_PLAIN = (str, int, float, bool, type(None), list, tuple, dict)
+_WIDTH_METHODS = {"center", "ljust", "rjust", "zfill", "expandtabs"}
+_PRINTF_SIZES = re.compile(r"%[-+ #0]*(\*|\d+)?(?:\.(\*|\d+))?")
+
+
+def _check_printf(fmt: str) -> None:
+    for width, precision in _PRINTF_SIZES.findall(fmt):
+        for n in (width, precision):
+            if n == "*" or (n and int(n) > MAX_WIDTH):
+                raise SecurityError("format width too large")
+
+
 class _Sandbox(SandboxedEnvironment):
-    intercepted_binops = frozenset({"*", "**"})
+    intercepted_binops = frozenset({"*", "**", "%"})
+
+    def is_safe_attribute(self, obj, attr, value):
+        # Plain data and Jinja's own helpers (loop, cycler, namespace) only. Word objects
+        # (InlineImage.tpl is the live DocxTemplate, with save() and friends) stay opaque.
+        if not (isinstance(obj, _PLAIN) or type(obj).__module__.startswith("jinja2.")):
+            return False
+        return super().is_safe_attribute(obj, attr, value)
 
     def call_binop(self, context, operator, left, right):
-        if operator == "**" and isinstance(right, (int, float)) and abs(right) > 100:
-            raise SecurityError("exponent too large")
+        if operator == "**" and (not isinstance(left, (int, float)) or abs(left) > 10**6
+                                 or not isinstance(right, (int, float)) or abs(right) > 100):
+            raise SecurityError("power too large")
         if operator == "*":
             sizes = [len(v) for v in (left, right) if isinstance(v, (str, bytes, list, tuple))]
             counts = [v for v in (left, right) if isinstance(v, int)]
             if sizes and counts and sizes[0] * abs(counts[0]) > MAX_REPEAT * 100:
                 raise SecurityError("repetition too large")
+        if operator == "%" and isinstance(left, str):
+            _check_printf(left)
         return super().call_binop(context, operator, left, right)
+
+    def call(__self, __context, __obj, *args, **kwargs):  # noqa: N805 (Jinja's signature: "self" may be a kwarg)
+        if (getattr(__obj, "__name__", "") in _WIDTH_METHODS and isinstance(getattr(__obj, "__self__", None), str)
+                and any(isinstance(a, int) and a > MAX_WIDTH for a in (*args, *kwargs.values()))):
+            raise SecurityError("width too large")
+        return super().call(__context, __obj, *args, **kwargs)
+
+
+def _safe_center(value, width=80):
+    if isinstance(width, int) and width > MAX_WIDTH:
+        raise SecurityError("width too large")
+    return do_center(value, width)
+
+
+def _safe_indent(s, width=4, *args, **kwargs):
+    if isinstance(width, int) and width > MAX_WIDTH or isinstance(width, str) and len(width) > MAX_WIDTH:
+        raise SecurityError("indent too large")
+    return do_indent(s, width, *args, **kwargs)
+
+
+def _safe_format(value, *args, **kwargs):
+    _check_printf(str(value))
+    return do_format(value, *args, **kwargs)
 
 
 def _environment() -> SandboxedEnvironment:
-    return _Sandbox(autoescape=True)
+    env = _Sandbox(autoescape=True)
+    env.filters.update(center=_safe_center, indent=_safe_indent, format=_safe_format)
+    return env
 
 
 def check_template(data: bytes) -> None:
@@ -80,10 +141,12 @@ def check_template(data: bytes) -> None:
             if "word/document.xml" not in names:
                 raise TemplateProblem("this is not a Word document (.docx)")
             for info in infos:
-                if info.filename.endswith((".xml", ".rels")):
-                    head = zf.read(info)
-                    if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
-                        raise TemplateProblem("the template contains XML declarations that are not allowed")
+                # Every part but pictures, whatever its name, in UTF-8 or UTF-16.
+                if info.filename.lower().startswith("word/media/"):
+                    continue
+                part = zf.read(info)
+                if any(marker in part for marker in _XML_DECLARATIONS):
+                    raise TemplateProblem("the template contains XML declarations that are not allowed")
     except zipfile.BadZipFile:
         raise TemplateProblem("this is not a Word document (.docx)") from None
     try:
@@ -214,7 +277,7 @@ def build_docx_context(ctx: dict, tpl: DocxTemplate) -> dict:
     c["branding"] = _sanitize({k: v for k, v in branding.items() if k not in ("logo", "logo_data_uri")})
     eng = c["engagement"]
     c["rt"] = {key: rich(tpl, eng.get(key)) for key in ("executive_summary", "description", "rules_of_engagement")}
-    c["prepared_by_line"] = ", ".join(x for x in (c["prepared_by"]["name"], branding["organization"]) if x)
+    c["prepared_by_line"] = ", ".join(x for x in (c["prepared_by"]["name"], c["branding"]["organization"]) if x)
     logo = branding.get("logo")
     c["logo"] = (_image(tpl, logo, width_mm=55, max_height_mm=22) or "") if logo else ""
 
@@ -249,9 +312,64 @@ def build_docx_context(ctx: dict, tpl: DocxTemplate) -> dict:
 
 
 def render_docx(ctx: dict, template: bytes | None = None) -> bytes:
-    """Render the report context into a .docx (``template`` = a user's template bytes)."""
-    if template is not None:
-        check_template(template)
+    """Render the report context into a .docx (``template`` = a user's template bytes).
+
+    The built-in template renders here. A user's template renders in a child
+    process with a time limit: see the module docstring.
+    """
+    if template is None:
+        return _render(ctx, None)
+    check_template(template)
+    mp = multiprocessing.get_context("spawn")
+    receiver, sender = mp.Pipe(duplex=False)
+    proc = mp.Process(target=_render_child, args=(sender, ctx, template), daemon=True,
+                      name="offsechub-docx-template")
+    proc.start()
+    sender.close()
+    try:
+        if not receiver.poll(RENDER_TIMEOUT_S):
+            raise TemplateProblem(f"rendering took longer than {RENDER_TIMEOUT_S} seconds, so it was stopped")
+        try:
+            # Raw bytes, never pickle: the child ran an untrusted template.
+            message = receiver.recv_bytes(MAX_OUTPUT_BYTES)
+        except EOFError:
+            raise TemplateProblem("the renderer stopped (the template may use too much memory)") from None
+        except OSError:
+            raise TemplateProblem("the rendered report is too large") from None
+    finally:
+        receiver.close()
+        if proc.is_alive():
+            proc.kill()
+        proc.join(10)
+    kind, body = message[:1], message[1:]
+    if kind == b"K":
+        return body
+    if kind == b"P":
+        raise TemplateProblem(body.decode("utf-8", "replace"))
+    raise RuntimeError(f"the Word renderer failed: {body.decode('utf-8', 'replace')}")
+
+
+def _render_child(conn, ctx: dict, template: bytes) -> None:
+    """Child process entry point: render, then send one status byte and the payload."""
+    try:
+        if sys.platform.startswith("linux"):
+            import resource
+
+            resource.setrlimit(resource.RLIMIT_AS, (CHILD_MEMORY_BYTES, CHILD_MEMORY_BYTES))
+        body = _render(ctx, template)
+    except TemplateProblem as exc:
+        conn.send_bytes(b"P" + str(exc).encode("utf-8"))
+    except MemoryError:
+        conn.send_bytes(b"P" + b"the template used too much memory, so it was stopped")
+    except BaseException as exc:  # reported to the parent, which raises
+        conn.send_bytes(b"E" + f"{type(exc).__name__}: {exc}"[:2000].encode("utf-8"))
+    else:
+        conn.send_bytes(b"K" + body)
+    finally:
+        conn.close()
+
+
+def _render(ctx: dict, template: bytes | None) -> bytes:
     tpl = DocxTemplate(io.BytesIO(template) if template is not None else BUILTIN)
     if template is None:
         # The built-in template takes its accent colour from the branding settings.

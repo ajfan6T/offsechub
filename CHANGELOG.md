@@ -4,13 +4,13 @@
 
 ### Reports
 - **PDF export**, built directly (no printing from a browser), with a linked table of contents, bookmarks and "Page X of Y".
-- **Word export** from a built-in template, or from your own: download the built-in one, restyle it in Word and upload it. Templates render in a sandbox. See [docs/REPORT_TEMPLATES.md](https://github.com/ajfan6T/offsechub/blob/HEAD/docs/REPORT_TEMPLATES.md).
+- **Word export** from a built-in template, or from your own: download the built-in one, restyle it in Word and upload it. Your templates render in a sandbox, in a separate process with a time limit. See [docs/REPORT_TEMPLATES.md](https://github.com/ajfan6T/offsechub/blob/HEAD/docs/REPORT_TEMPLATES.md).
 - **Branding** for every format: logo, accent colour, classification and footer text, stored inside the vault.
 - **Formatted finding text:** bold, italic, code, links, lists, headings and code blocks, with a preview in the editor and the same rendering in every report format.
 
 ### Findings
 - **CVSS 4.0** scoring and calculator, next to CVSS 3.1. Nuclei imports keep 4.0 vectors.
-- **Retest tracking:** record each retest (resolved, partially resolved, not resolved) with its date, tester and notes. A resolved retest marks the finding remediated. Reports show a retest column and the history.
+- **Retest tracking:** record each retest (resolved, partially resolved, not resolved) with its date, tester and notes. The status follows the latest retest: resolved marks the finding remediated, and a failed one reopens it. Reports show a retest column and the history.
 - **Exports for ticketing:** CSV for Jira (safe against spreadsheet formulas), SARIF 2.1.0 and DefectDojo JSON.
 
 ### Imports

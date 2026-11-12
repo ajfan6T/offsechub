@@ -97,9 +97,10 @@ Links are blue and underlined. Code inside a line uses Consolas.
 A template can come from anyone, so OffsecHub treats it as untrusted:
 
 - It must be a `.docx` of at most 5 MB, and no larger than 64 MB unpacked.
-- Its XML must not contain `<!DOCTYPE` or `<!ENTITY`.
+- Its parts must not contain `<!DOCTYPE` or `<!ENTITY` (pictures aside).
 - Its tags must be valid. Errors are shown when you upload it.
-- It renders in Jinja's sandbox: it can read the values above, but not reach Python or files. Enormous repetitions such as `{{ 'x' * 10**9 }}` are refused.
+- It renders in Jinja's sandbox: it can read the values above, but not reach Python, files, or the insides of pictures and formatted text. Enormous repetitions, powers and padding, such as `{{ 'x' * 10**9 }}` or `{{ 'x'.center(10**9) }}`, are refused.
+- It renders in a separate process, which is stopped if it takes more than two minutes.
 
 Templates are stored inside the encrypted vault, like the logo.
 

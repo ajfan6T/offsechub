@@ -168,10 +168,32 @@ RETEST_LABELS = {"resolved": "resolved", "partially_resolved": "partially resolv
                  "not_resolved": "not resolved"}
 
 
+def _follow_latest_retest(db: Session, f: Finding) -> str:
+    """Keep the status in step with the latest retest (by date, then entry order).
+
+    A resolved latest retest marks a confirmed or reported finding remediated; a
+    latest retest that is not resolved reopens a remediated finding as reported.
+    Returns the audit-summary suffix, if the status changed.
+    """
+    db.flush()
+    db.expire(f, ["retests"])
+    if not f.retests:
+        return ""
+    latest = f.retests[-1]  # ordered by (tested_on, id)
+    if latest.result == "resolved" and f.status in ("confirmed", "reported"):
+        new = "remediated"
+    elif latest.result != "resolved" and f.status == "remediated":
+        new = "reported"
+    else:
+        return ""
+    old, f.status = f.status, new
+    return f"; status {old} -> {new}"
+
+
 @router.post(prefix + "/{finding_id}/retests", response_model=RetestOut, status_code=201)
 def add_retest(finding_id: int, body: RetestIn, eng: Engagement = Depends(get_engagement),
                db: Session = Depends(get_db)):
-    """Record a retest. A resolved retest marks a confirmed or reported finding remediated."""
+    """Record a retest; the finding's status follows the latest one (see _follow_latest_retest)."""
     f = get_or_404(db, Finding, finding_id, eng.id)
     tester = body.tester if body.tester is not None else (
         (get_setting(db, "operator.profile") or {}).get("name") or "")
@@ -179,9 +201,7 @@ def add_retest(finding_id: int, body: RetestIn, eng: Engagement = Depends(get_en
                            result=body.result, tester=tester.strip(), notes=body.notes)
     db.add(retest)
     summary = f"Retested {finding_ref(eng, f)} {f.title}: {RETEST_LABELS[body.result]}"
-    if body.result == "resolved" and f.status in ("confirmed", "reported"):
-        summary += f"; status {f.status} -> remediated"
-        f.status = "remediated"
+    summary += _follow_latest_retest(db, f)
     db.flush()
     audit.record(db, action="update", entity_type="finding", entity_id=f.id,
                  engagement_id=eng.id, summary=summary)
@@ -197,9 +217,10 @@ def delete_retest(finding_id: int, retest_id: int, eng: Engagement = Depends(get
     if retest is None or retest.finding_id != f.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Retest not found")
     db.delete(retest)
+    change = _follow_latest_retest(db, f)
     audit.record(db, action="update", entity_type="finding", entity_id=f.id,
                  engagement_id=eng.id,
-                 summary=f"Removed a retest of {finding_ref(eng, f)} ({retest.tested_on})")
+                 summary=f"Removed a retest of {finding_ref(eng, f)} ({retest.tested_on}){change}")
     db.commit()
 
 
