@@ -11,7 +11,9 @@ the user's settings. Checks, in order:
    the installed build);
 2. the desktop window (or `--browser` mode) starts, publishes runtime.json and
    serves the UI;
-3. the local API unlocks the demo vault and renders a report (templates);
+3. the local API unlocks the demo vault and renders a report (templates), and
+   DOCX and PDF reports where the app offers them (python-docx, ReportLab,
+   lxml, Pillow and the bundled fonts in the installed build);
 4. the window is still alive a few seconds later (the GUI toolkit loaded);
 5. a normal shutdown (SIGTERM, or closing the window on Windows) saves, locks
    and removes runtime.json.
@@ -126,6 +128,14 @@ def main() -> None:
     if status != 200 or b"ACME Corporation" not in body:
         fail(f"report: HTTP {status}", proc)
     ok("UI served; vault unlocked; report rendered")
+    for fmt, magic in (("docx", b"PK\x03\x04"), ("pdf", b"%PDF-")):
+        status, body = call(port, token, "GET", f"/api/engagements/{engagements[0]['id']}/report?format={fmt}")
+        if status == 422:  # a format this version doesn't offer
+            print(f"SKIP {fmt} report: not offered by this version", flush=True)
+            continue
+        if status != 200 or not body.startswith(magic):
+            fail(f"{fmt} report: HTTP {status}: {body[:300]!r}", proc)
+        ok(f"{fmt} report rendered ({len(body)} bytes)")
 
     time.sleep(5)
     if proc.poll() is not None:

@@ -28,14 +28,27 @@ if not (DIST / "index.html").exists():
 
 datas = [
     (str(DIST), "frontend/dist"),
+    # Whole folders: methodologies, finding templates, the DejaVu fonts for PDF
+    # reports (with their licence), and every report template (.j2, report.docx).
     (str(BACKEND / "app" / "data"), "app/data"),
     (str(BACKEND / "app" / "templates"), "app/templates"),
     (str(ROOT / "samples"), "samples"),
 ]
 datas += collect_data_files("webview")  # pywebview's injected JS
+# python-docx reads its default document and parts (docx/templates/*): Document()
+# without a file, and new headers, footers, styles or comments.
+datas += collect_data_files("docx")
 
 hiddenimports = (collect_submodules("app") + collect_submodules("uvicorn") + collect_submodules("argon2")
                  + ["_argon2_cffi_bindings", "_cffi_backend"])
+# Reports: DOCX (python-docx, docxtpl) and PDF (ReportLab). ReportLab loads its
+# settings and the metrics of the 14 standard fonts by name; it needs none of its
+# own font files, since PDFs embed the DejaVu TTFs from app/data/fonts and the
+# standard fonts are never embedded. lxml and Pillow (images in PDFs) are native
+# extensions; pyinstaller-hooks-contrib covers their submodules and the compiled
+# part of charset-normalizer.
+hiddenimports += (collect_submodules("docx") + collect_submodules("docxtpl") + collect_submodules("reportlab.pdfbase")
+                  + ["reportlab.rl_settings", "lxml.etree", "lxml._elementpath", "PIL.Image"])
 if sys.platform.startswith("linux"):
     # gi.overrides make GLib.idle_add & co. Pythonic; without them pywebview's GTK
     # backend fails at runtime. WebKitGTK itself comes from the system.
@@ -50,7 +63,11 @@ a = Analysis(  # noqa: F821
     pathex=[str(BACKEND)],
     datas=datas,
     hiddenimports=hiddenimports,
-    excludes=["tkinter", "pytest", "hypothesis", "IPython", "matplotlib", "numpy", "PIL"],
+    excludes=["tkinter", "pytest", "hypothesis", "IPython", "matplotlib", "numpy"],
+    # python-docx opens docx/parts/../templates/*.xml (headers, footers, styles,
+    # settings, comments). On macOS and Linux that path needs a real docx/parts
+    # folder, so its sources are collected too; the modules still load from the archive.
+    module_collection_mode={"docx": "pyz+py"},
     noarchive=False,
 )
 pyz = PYZ(a.pure)  # noqa: F821
