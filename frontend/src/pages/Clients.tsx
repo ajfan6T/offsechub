@@ -12,7 +12,7 @@ export function Clients() {
     <>
       <PageHeader
         title="Clients"
-        subtitle="Organisations you test for."
+        subtitle="Organizations you test for."
         actions={
           <Button variant="primary" onClick={() => setEditing("new")}>
             New client

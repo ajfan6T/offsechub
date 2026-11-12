@@ -17,6 +17,7 @@ from .models import (
     Client,
     Engagement,
     Finding,
+    FindingRetest,
     FindingTemplate,
     OperatorLogEntry,
     ReconImport,
@@ -154,10 +155,12 @@ def _findings(db: Session, eng: Engagement, store: Store) -> None:
     if git:
         git.status = "confirmed"
         git.title = "Exposed Git Repository"
-        git.impact = ("An attacker can download the repository history, which may contain "
+        git.impact = ("An attacker can download the repository **history**, which may contain "
                       "source code, credentials and internal hostnames.")
-        git.remediation = ("Block access to /.git/ at the web server and rotate any secrets "
-                           "committed to the repository.")
+        git.remediation = ("1. Block requests to `/.git/` at the web server.\n"
+                           "2. Remove the repository from the web root.\n"
+                           "3. **Rotate any secrets** committed to the repository, including in "
+                           "its history.")
     targets = {t.value: t for t in eng.targets}
     rdp = {
         "title": "Internet-exposed RDP with weak administrator password",
@@ -179,6 +182,11 @@ def _findings(db: Session, eng: Engagement, store: Store) -> None:
         f.targets = [targets[v] for v in target_values if v in targets]
         db.add(f)
         db.flush()
+        if template_title == "Weak TLS Configuration":
+            # The client says it is fixed; the retest says otherwise.
+            db.add(FindingRetest(finding_id=f.id, tested_on=date.today() - timedelta(days=1),
+                                 result="not_resolved", tester=DEMO_PROFILE["name"],
+                                 notes="TLS 1.0 is still offered on `203.0.113.10:443`."))
 
     storage.add_evidence(
         db, store(GIT_CONFIG_RESPONSE), engagement_id=eng.id,

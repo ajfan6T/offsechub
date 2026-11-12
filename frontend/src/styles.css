@@ -54,7 +54,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.15); }
 input:disabled, select:disabled, textarea:disabled { opacity: 0.7; cursor: not-allowed; }
 textarea { resize: vertical; }
-input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--accent); }
 input[type="file"] { padding: 6px; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 /* Drawn by us, not the OS theme: WebKitGTK otherwise paints native (light) GTK widgets. */
@@ -293,6 +293,7 @@ pre.code { background: var(--bg-2); border: 1px solid var(--line); border-radius
 /* --------------------------------------------------------------- forms */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
 .form-grid.single { grid-template-columns: 1fr; }
+.form-grid > p { margin: 0; }
 .form-grid + .btn, .form-grid + .actions { margin-top: 14px; }
 .oplog-form { grid-template-columns: repeat(4, 1fr); }
 .oplog-form .field-wide { grid-column: span 2; }

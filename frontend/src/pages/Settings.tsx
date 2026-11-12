@@ -549,7 +549,7 @@ function BrandingForm({ branding }: { branding: ReportBranding }) {
   return (
     <div className="form-grid single">
       <p className="muted small">Applied to every report format (PDF, Word, HTML, Markdown). Stored inside this vault.</p>
-      <Field label="Organisation" hint={profile.data?.organization ? `Defaults to your profile: ${profile.data.organization}` : undefined}>
+      <Field label="Organization" hint={profile.data?.organization ? `Defaults to your profile: ${profile.data.organization}` : undefined}>
         <input value={form.organization} onChange={set("organization")} placeholder={profile.data?.organization || "Your company"} />
       </Field>
       <Field label="Classification" hint="Shown on the cover and in the page header; leave empty to omit">
