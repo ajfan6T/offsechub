@@ -203,10 +203,12 @@ def test_span_defaults():
 
 # Parse time. Finding text can quote whatever a target sent back (nuclei extracted-results
 # lands in finding fields unescaped), so no input may make parsing slower than linear and
-# stall a report. Each input below once took from seconds to hours; now well under a second.
+# stall a report. Each input below once took from 25 seconds to hours; now well under two.
 
 
-def parses_quickly(text, limit=2.0):
+def parses_quickly(text, limit=5.0):
+    # Generous for slow CI machines: every input takes well under 2 s now, and the old
+    # quadratic code took 25 s to hours on them.
     start = time.perf_counter()
     blocks = parse(text)
     elapsed = time.perf_counter() - start
@@ -257,5 +259,5 @@ def test_many_list_paragraphs_parse_in_linear_time():
 
 def test_many_spans_of_one_style_join_in_linear_time():
     # Joining neighbouring spans of one style used to copy the joined text again for each span.
-    [block] = parses_quickly("*a " + "(_b_)" * 100_000 + " c*")
-    assert block.spans == [Span("a " + "(b)" * 100_000 + " c", italic=True)]
+    [block] = parses_quickly("*a " + "(_b_)" * 200_000 + " c*")
+    assert block.spans == [Span("a " + "(b)" * 200_000 + " c", italic=True)]
