@@ -4,13 +4,18 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import StatementError
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from ..db import get_vault
 from ..deps import get_engagement
+from ..models import Engagement
+from ..schemas import ClientOut, ImportOut, OplogOut, ScopeItemOut, TestCaseOut
 from ..services import audit, handoff, storage
 from ..vault import header as vault_header
 from ..vault.manager import OpenVault, VaultLocked
+from . import activity, engagements, evidence, findings, recon, scope, targets, testing
 from .evidence import vault_session
 
 router = APIRouter(tags=["handoff"])
@@ -80,6 +85,34 @@ async def import_handoff(request: Request, vault: OpenVault = Depends(get_vault)
         spooled.close()
 
 
+# What a file's data can still cause after validation: a database constraint
+# (or an integer SQLite cannot hold), or a record that the pages' code or
+# response models cannot handle. Anything else is a server error.
+_DATA_ERRORS = (StatementError, ValueError, TypeError, LookupError)
+
+
+def _check_displayable(db: Session, eng: Engagement) -> None:
+    """Defence in depth: build what the engagement's pages load, as their endpoints do.
+
+    Validation should already ensure this. Anything that slips past it fails
+    the import (ValueError and friends) instead of a page later (a 500).
+    """
+    db.flush()
+    db.expire_all()  # read back what was stored, as a later request will
+    engagements.read_engagement(eng=eng, db=db)
+    engagements.engagement_summary(eng=eng, db=db)
+    ClientOut.model_validate(eng.client)
+    targets.list_targets(q=None, scope_status=None, kind=None, eng=eng, db=db)
+    findings.list_findings(severity=None, status_filter=None, eng=eng, db=db)
+    evidence.list_evidence(finding_id=None, target_id=None, eng=eng, db=db)
+    for rows, model in ((scope.list_scope(eng=eng), ScopeItemOut),
+                        (testing.list_tests(eng=eng, db=db), TestCaseOut),
+                        (activity.list_oplog(eng=eng, db=db), OplogOut),
+                        (recon.list_imports(eng=eng, db=db), ImportOut)):
+        for row in rows:
+            model.model_validate(row)
+
+
 def _import(vault: OpenVault, src, passphrase: str) -> dict:
     try:
         manifest, blobs = handoff.read_handoff(vault, src, passphrase)
@@ -87,13 +120,21 @@ def _import(vault: OpenVault, src, passphrase: str) -> dict:
         raise HTTPException(400, str(exc)) from None
     try:
         with vault_session(vault) as db:
-            eng = handoff.apply_manifest(db, manifest, blobs)
-            out = {"engagement_id": eng.id, "code": eng.code, "renamed": eng.code != manifest.engagement.code,
-                   "findings": len(manifest.findings), "evidence_files": len(manifest.evidence)}
-            db.commit()
-            return out
+            try:
+                eng = handoff.apply_manifest(db, manifest, blobs)
+                _check_displayable(db, eng)
+                out = {"engagement_id": eng.id, "code": eng.code, "renamed": eng.code != manifest.engagement.code,
+                       "findings": len(manifest.findings), "evidence_files": len(manifest.evidence)}
+                db.commit()
+                return out
+            except BaseException:
+                db.rollback()  # no partial engagement
+                raise
     except BaseException as exc:
-        storage.delete_blobs(vault, [b.blob_id for b in blobs.values()])
+        # Nothing was committed, so no row refers to the new blobs: delete every one.
+        storage.delete_blobs(vault, [b.blob_id for b in blobs])
         if isinstance(exc, handoff.HandoffError):
             raise HTTPException(400, str(exc)) from None
+        if isinstance(exc, _DATA_ERRORS):
+            raise HTTPException(400, "the file's contents could not be imported") from None
         raise

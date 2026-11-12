@@ -2,9 +2,9 @@
 
 import re
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 EngagementType = Literal[
     "external_network",
@@ -39,6 +39,18 @@ SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 REPORTABLE_STATUSES = ("confirmed", "reported", "remediated", "risk_accepted")
 
 _CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,31}$")
+
+
+def engagement_code(v: str) -> str:
+    """Normalise an engagement code and check it: it names report and CSV downloads."""
+    v = v.strip().upper()
+    if not _CODE_RE.match(v):
+        raise ValueError("code must be 2-32 chars of A-Z, 0-9 and '-'")
+    return v
+
+
+# Shared by the API and hand-off import (app.services.handoff).
+EngagementCode = Annotated[str, AfterValidator(engagement_code)]
 
 
 class ORM(BaseModel):
@@ -86,21 +98,13 @@ class ClientOut(ORM):
 class EngagementCreate(BaseModel):
     client_id: int
     name: str = Field(min_length=1, max_length=255)
-    code: str
+    code: EngagementCode
     type: EngagementType
     status: EngagementStatus = "planning"
     start_date: date | None = None
     end_date: date | None = None
     description: str = ""
     rules_of_engagement: str = ""
-
-    @field_validator("code")
-    @classmethod
-    def _code(cls, v: str) -> str:
-        v = v.strip().upper()
-        if not _CODE_RE.match(v):
-            raise ValueError("code must be 2-32 chars of A-Z, 0-9 and '-'")
-        return v
 
 
 class EngagementUpdate(BaseModel):

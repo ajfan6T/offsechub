@@ -13,9 +13,10 @@ normative description; in short:
 Export streams evidence from the vault's encrypted blobs straight into the
 hand-off encryptor, and import streams it back into new blobs: plaintext never
 touches disk. Import treats the file as untrusted: the KDF parameters are
-checked before Argon2 runs, the manifest is validated field by field, every
-evidence file must match its recorded size and SHA-256, and nothing is added
-to the vault unless the whole file authenticates and parses.
+checked before Argon2 runs, the manifest is validated field by field (by the
+API's rules), its ids must be unique and its links resolve, every evidence
+file must match its recorded size and SHA-256, and nothing is added to the
+vault unless the whole file authenticates and parses.
 """
 
 from __future__ import annotations
@@ -25,12 +26,12 @@ import json
 import os
 import struct
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Hashable, Iterable, Iterator
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import BinaryIO, Literal
+from typing import Annotated, BinaryIO, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -49,21 +50,25 @@ from ..models import (
     TestCase,
 )
 from ..schemas import (
+    EngagementCode,
     EngagementStatus,
     EngagementType,
     FindingStatus,
+    ImportTool,
     OplogOutcome,
     RetestResult,
     ScopeKind,
     ScopeRule,
     Severity,
+    TargetKind,
     TargetStatus,
     TestStatus,
 )
 from ..vault import crypto, durable
 from ..vault.crypto import Argon2Params, CryptoError
 from ..vault.manager import MIN_PASSWORD, OpenVault
-from . import audit, storage
+from . import audit, cvss, storage
+from .scope import normalize_scope_value
 
 MAGIC = b"OHEX"
 VERSION = 1
@@ -80,149 +85,262 @@ class HandoffError(Exception):
 
 
 # ------------------------------------------------------------------ manifest
-# Explicit, validated models: an imported file is untrusted input.
+# Explicit, validated models: an imported file is untrusted input. They mirror
+# the API's input schemas field by field (the same Literal types and engagement
+# code rule, from app.schemas) and admit everything the importers store, so an
+# export from any vault imports and nothing is imported that the app could not
+# show. Where the app sets no limit of its own, a string is bounded by MAX_TEXT.
 
-S = Field(default="", max_length=255)
-T = Field(default="", max_length=1_000_000)
+MAX_TEXT = 1_000_000  # characters, for every string without a tighter limit
+MAX_ITEMS = 1_000_000  # entries in any list (the 64 MiB manifest limit binds first)
+NAME = 255  # the API's limit on names, titles, testers and operators
+SOURCE = 50  # "manual", "template" or an import tool
+Count = Annotated[int, Field(ge=0, le=2**53 - 1)]
 
 
-class _Service(BaseModel):
+def _items():
+    return Field(default_factory=list, max_length=MAX_ITEMS)
+
+
+class _Record(BaseModel):
+    model_config = ConfigDict(str_max_length=MAX_TEXT)
+
+
+class _Service(_Record):
+    """ServiceIn, except that ``protocol`` is whatever a scan reported (Nmap "ip", Nessus "icmp")."""
+
     port: int = Field(ge=0, le=65535)
-    protocol: Literal["tcp", "udp", "sctp"] = "tcp"
-    state: str = Field(default="open", max_length=20)
-    name: str = Field(default="", max_length=100)
-    product: str = S
-    version: str = S
-    extra_info: str = T
+    protocol: str = "tcp"
+    state: str = "open"
+    name: str = ""
+    product: str = ""
+    version: str = ""
+    extra_info: str = ""
 
 
-class _Target(BaseModel):
+class _Target(_Record):
+    """TargetIn plus what the app sets. Importers store values longer than the API's 512."""
+
     id: int
-    kind: str = Field(default="host", max_length=20)
-    value: str = Field(min_length=1, max_length=512)
-    hostname: str = S
-    ip: str = Field(default="", max_length=64)
-    os: str = S
+    kind: TargetKind = "host"
+    value: str  # the API strips it, so even "" can be stored
+    hostname: str = ""
+    ip: str = ""
+    os: str = ""
     status: TargetStatus = "new"
-    tags: list[str] = Field(default_factory=list, max_length=200)
-    notes: str = T
-    source: str = Field(default="manual", max_length=50)
-    services: list[_Service] = Field(default_factory=list, max_length=70_000)
+    tags: list[str] = _items()
+    notes: str = ""
+    source: str = Field(default="manual", max_length=SOURCE)
+    services: list[_Service] = _items()
 
 
-class _Retest(BaseModel):
+class _Retest(_Record):
     tested_on: date
     result: RetestResult
-    tester: str = S
-    notes: str = T
+    tester: str = Field(default="", max_length=NAME)
+    notes: str = ""
 
 
-class _Finding(BaseModel):
+class _Finding(_Record):
+    """FindingIn plus what the app sets (number, score, source, retests)."""
+
     id: int
-    number: int = Field(ge=1)
-    title: str = Field(min_length=1, max_length=255)
+    number: int = Field(ge=1, le=2**31 - 1)
+    title: str = Field(min_length=1, max_length=NAME)
     severity: Severity
     status: FindingStatus
-    cvss_vector: str = Field(default="", max_length=512)
+    cvss_vector: str = ""
     cvss_score: float | None = Field(default=None, ge=0, le=10)
-    cwe: str = Field(default="", max_length=20)
-    description: str = T
-    impact: str = T
-    steps_to_reproduce: str = T
-    remediation: str = T
-    references: str = T
-    source: str = Field(default="manual", max_length=50)
-    source_ref: str = Field(default="", max_length=512)
-    targets: list[int] = Field(default_factory=list)
-    retests: list[_Retest] = Field(default_factory=list)
+    cwe: str = ""
+    description: str = ""
+    impact: str = ""
+    steps_to_reproduce: str = ""
+    remediation: str = ""
+    references: str = ""
+    source: str = Field(default="manual", max_length=SOURCE)
+    source_ref: str = ""
+    targets: list[int] = _items()
+    retests: list[_Retest] = _items()
+
+    @model_validator(mode="after")
+    def _cvss(self) -> "_Finding":
+        """As in the API: a vector must score, and the score is the vector's."""
+        vector = self.cvss_vector.strip()
+        if not vector:
+            self.cvss_vector, self.cvss_score = "", None
+            return self
+        try:
+            result = cvss.calculate(vector)
+        except cvss.CvssError as exc:
+            raise ValueError(f"invalid CVSS vector: {exc}") from None
+        self.cvss_vector, self.cvss_score = result.vector, result.score
+        return self
 
 
-class _TestCase(BaseModel):
+class _TestCase(_Record):
+    """TestCaseIn; ``target`` and ``finding`` are manifest ids."""
+
     id: int
-    methodology: str = Field(default="custom", max_length=100)
-    ref: str = Field(default="", max_length=50)
-    category: str = Field(default="General", max_length=100)
-    title: str = Field(min_length=1, max_length=255)
-    description: str = T
+    methodology: str = "custom"
+    ref: str = ""
+    category: str = "General"
+    title: str = Field(min_length=1, max_length=NAME)
+    description: str = ""
     status: TestStatus = "not_started"
-    notes: str = T
+    notes: str = ""
     target: int | None = None
     finding: int | None = None
 
 
-class _Oplog(BaseModel):
+class _Oplog(_Record):
     occurred_at: datetime
-    operator: str = S
-    source_host: str = S
-    target: str = Field(default="", max_length=512)
-    tool: str = Field(default="", max_length=100)
-    command: str = T
-    description: str = T
+    operator: str = Field(default="", max_length=NAME)
+    source_host: str = ""
+    target: str = ""
+    tool: str = ""
+    command: str = ""
+    description: str = ""
     outcome: OplogOutcome = "info"
 
 
-class _Evidence(BaseModel):
+class _Evidence(_Record):
+    """What the upload endpoints store (name and type are sanitised again on import)."""
+
     id: int
-    filename: str = Field(min_length=1, max_length=255)
+    filename: str = Field(min_length=1, max_length=NAME)
     content_type: str = Field(default="application/octet-stream", max_length=100)
     size: int = Field(ge=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    description: str = T
+    description: str = ""
     finding: int | None = None
     target: int | None = None
     test_case: int | None = None
     created_at: datetime
 
 
-class _Import(BaseModel):
-    tool: str = Field(max_length=30)
-    filename: str = S
-    stats: dict = Field(default_factory=dict)
+class _ImportStats(_Record):
+    """The counts a recon import records (importers/apply.py), as the Recon page reads them."""
+
+    hosts_seen: Count = 0
+    targets_created: Count = 0
+    targets_updated: Count = 0
+    services_created: Count = 0
+    findings_created: Count = 0
+    findings_updated: Count = 0
+    skipped_out_of_scope: Count = 0
+    skipped_excluded: Count = 0
+    errors: list[str] = _items()
+
+
+class _Import(_Record):
+    tool: ImportTool
+    filename: str = Field(default="", max_length=NAME)
+    stats: _ImportStats = Field(default_factory=_ImportStats)
     evidence: int | None = None
     created_at: datetime
 
 
-class _Client(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    industry: str = Field(default="", max_length=100)
-    contact_name: str = S
-    contact_email: str = S
-    notes: str = T
+class _Client(_Record):
+    name: str = Field(min_length=1, max_length=NAME)
+    industry: str = ""
+    contact_name: str = ""
+    contact_email: str = ""
+    notes: str = ""
 
 
-class _Engagement(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    code: str = Field(min_length=1, max_length=32)
+class _Engagement(_Record):
+    name: str = Field(min_length=1, max_length=NAME)
+    code: EngagementCode  # it names report and CSV downloads
     type: EngagementType
     status: EngagementStatus
     start_date: date | None = None
     end_date: date | None = None
-    description: str = T
-    rules_of_engagement: str = T
-    executive_summary: str = T
+    description: str = ""
+    rules_of_engagement: str = ""
+    executive_summary: str = ""
+
+    @model_validator(mode="after")
+    def _dates(self) -> "_Engagement":
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("end_date is before start_date")
+        return self
 
 
-class _Scope(BaseModel):
+class _Scope(_Record):
     kind: ScopeKind
-    value: str = Field(min_length=1, max_length=512)
+    value: str = Field(min_length=1, max_length=512 + 1)  # the API's 512, plus the "/" a URL can gain
     rule: ScopeRule = "include"
-    notes: str = T
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "_Scope":
+        """As in the API: the value must suit its kind (scope matching relies on that)."""
+        try:
+            self.value = normalize_scope_value(self.kind, self.value)
+        except ValueError as exc:
+            raise ValueError(f"invalid {self.kind} scope value: {exc}") from None
+        return self
 
 
-class Manifest(BaseModel):
+def _show(value: object) -> str:
+    text = repr(value) if isinstance(value, str) else str(value)
+    return text if len(text) <= 80 else text[:77] + "..."
+
+
+def _unique(what: str, values: Iterable[Hashable]) -> set:
+    seen: set = set()
+    for v in values:
+        if v in seen:
+            raise ValueError(f"{what} {_show(v)} appears more than once")
+        seen.add(v)
+    return seen
+
+
+def _resolve(owner: str, what: str, ref: int | None, ids: set[int]) -> None:
+    if ref is not None and ref not in ids:
+        raise ValueError(f"{owner} refers to {what} {ref}, which the file does not contain")
+
+
+class Manifest(_Record):
     format: Literal["offsechub-engagement"]
     version: Literal[1]
     created_at: datetime
     app_version: str = Field(max_length=32)
     client: _Client
     engagement: _Engagement
-    scope: list[_Scope] = Field(default_factory=list, max_length=100_000)
-    targets: list[_Target] = Field(default_factory=list, max_length=200_000)
-    findings: list[_Finding] = Field(default_factory=list, max_length=100_000)
-    test_cases: list[_TestCase] = Field(default_factory=list, max_length=100_000)
-    oplog: list[_Oplog] = Field(default_factory=list, max_length=1_000_000)
-    evidence: list[_Evidence] = Field(default_factory=list, max_length=100_000)
-    imports: list[_Import] = Field(default_factory=list, max_length=100_000)
+    scope: list[_Scope] = _items()
+    targets: list[_Target] = _items()
+    findings: list[_Finding] = _items()
+    test_cases: list[_TestCase] = _items()
+    oplog: list[_Oplog] = _items()
+    evidence: list[_Evidence] = _items()
+    imports: list[_Import] = _items()
+
+    @model_validator(mode="after")
+    def _links(self) -> "Manifest":
+        """Ids are unique per list, every link resolves, and the vault's unique keys hold."""
+        targets = _unique("target id", (t.id for t in self.targets))
+        findings = _unique("finding id", (f.id for f in self.findings))
+        tests = _unique("test case id", (tc.id for tc in self.test_cases))
+        evidence = _unique("evidence id", (ev.id for ev in self.evidence))
+        _unique("target value", (t.value for t in self.targets))
+        _unique("finding number", (f.number for f in self.findings))
+        for t in self.targets:
+            _unique(f"on target {t.id}, service", (f"{s.port}/{s.protocol}" for s in t.services))
+        for f in self.findings:
+            _unique(f"in finding {f.id}, target", f.targets)
+            for ref in f.targets:
+                _resolve(f"finding {f.id}", "target", ref, targets)
+        for tc in self.test_cases:
+            _resolve(f"test case {tc.id}", "target", tc.target, targets)
+            _resolve(f"test case {tc.id}", "finding", tc.finding, findings)
+        for ev in self.evidence:
+            _resolve(f"evidence {ev.id}", "finding", ev.finding, findings)
+            _resolve(f"evidence {ev.id}", "target", ev.target, targets)
+            _resolve(f"evidence {ev.id}", "test case", ev.test_case, tests)
+        for n, imp in enumerate(self.imports):
+            _resolve(f"import {n}", "evidence", imp.evidence, evidence)
+        return self
 
 
 BlobRef = tuple[str, bytes, str, int]  # storage key, blob key, sha256, size
@@ -368,12 +486,22 @@ class _Reader:
         return not self.read(1)
 
 
+def _problem(exc: ValidationError) -> str:
+    """The first validation error, readably: where it is and what is wrong."""
+    first = exc.errors(include_url=False)[0]
+    where = ".".join(str(part) for part in first["loc"])
+    what = first["msg"].removeprefix("Value error, ")
+    more = exc.error_count() - 1
+    return (f"{where}: {what}" if where else what) + (f" (and {more} more problem(s))" if more else "")
+
+
 def read_handoff(vault: OpenVault, src: BinaryIO, passphrase: str
-                 ) -> tuple[Manifest, dict[int, storage.StoredBlob]]:
+                 ) -> tuple[Manifest, list[storage.StoredBlob]]:
     """Decrypt and validate a hand-off file, storing its evidence as new vault blobs.
 
-    Returns the manifest and the new blob for each evidence id. On any error
-    the blobs written so far are deleted and HandoffError is raised.
+    Returns the manifest and the new blobs, one per evidence entry in manifest
+    order. On any error every blob written so far is deleted and the error
+    (HandoffError for anything wrong with the file) is raised.
     """
     header = src.read(HEADER_LEN)
     if len(header) != HEADER_LEN:
@@ -389,7 +517,7 @@ def read_handoff(vault: OpenVault, src: BinaryIO, passphrase: str
     except CryptoError:
         raise HandoffError("this hand-off file has unsupported key settings") from None
     key = _key(passphrase, salt, params)
-    blobs: dict[int, storage.StoredBlob] = {}
+    written: list[storage.StoredBlob] = []  # every blob committed so far, deleted again on failure
     try:
         reader = _Reader(crypto.stream_decrypt(key, header, src))
         try:
@@ -401,8 +529,7 @@ def read_handoff(vault: OpenVault, src: BinaryIO, passphrase: str
         try:
             manifest = Manifest.model_validate_json(reader.read(length))
         except ValidationError as exc:
-            raise HandoffError(f"the file's contents are not valid: {exc.error_count()} problem(s), e.g. "
-                               f"{exc.errors()[0]['loc']}: {exc.errors()[0]['msg']}") from None
+            raise HandoffError(f"the file's contents are not valid: {_problem(exc)}") from None
         for ev in manifest.evidence:
             writer = vault.open_blob_writer(ev.size)
             try:
@@ -412,17 +539,17 @@ def read_handoff(vault: OpenVault, src: BinaryIO, passphrase: str
                     writer.write(piece)
                 if sha.hexdigest() != ev.sha256:
                     raise HandoffError(f"evidence {ev.filename} does not match its fingerprint")
-                blobs[ev.id] = storage.StoredBlob(*writer.commit())
+                written.append(storage.StoredBlob(*writer.commit()))
             finally:
                 writer.abort()  # no-op after commit
         if not reader.at_end():
             raise HandoffError("the file is damaged")
-        return manifest, blobs
+        return manifest, written
     except CryptoError:
-        storage.delete_blobs(vault, [b.blob_id for b in blobs.values()])
+        storage.delete_blobs(vault, [b.blob_id for b in written])
         raise HandoffError("the passphrase is wrong or the file is damaged") from None
     except BaseException:
-        storage.delete_blobs(vault, [b.blob_id for b in blobs.values()])
+        storage.delete_blobs(vault, [b.blob_id for b in written])
         raise
     finally:
         crypto.wipe(key)
@@ -447,8 +574,15 @@ def _free_code(db: Session, code: str) -> str:
     raise HandoffError("could not find a free engagement code")
 
 
-def apply_manifest(db: Session, m: Manifest, blobs: dict[int, storage.StoredBlob]) -> Engagement:
-    """Create the engagement (and its client if new) from a validated manifest. Flushes, no commit."""
+def apply_manifest(db: Session, m: Manifest, blobs: list[storage.StoredBlob]) -> Engagement:
+    """Create the engagement (and its client if new) from a validated manifest. Flushes, no commit.
+
+    ``blobs`` are the evidence files' new blobs in manifest order, as read_handoff
+    returns them. Validation guarantees unique ids and links that resolve. On an
+    error the caller rolls back and deletes the blobs.
+    """
+    if len(blobs) != len(m.evidence):
+        raise HandoffError("the file's evidence does not match its manifest")
     client = db.scalar(select(Client).where(Client.name == m.client.name))
     if client is None:
         client = Client(**m.client.model_dump())
@@ -460,53 +594,30 @@ def apply_manifest(db: Session, m: Manifest, blobs: dict[int, storage.StoredBlob
     for s in m.scope:
         db.add(ScopeItem(engagement_id=eng.id, **s.model_dump()))
 
+    def new_id(rows: dict, old: int | None) -> int | None:
+        return None if old is None else rows[old].id
+
     targets: dict[int, Target] = {}
-    seen_values: set[str] = set()
     for t in m.targets:
-        if t.value in seen_values:
-            raise HandoffError(f"duplicate target {t.value}")
-        seen_values.add(t.value)
-        data = t.model_dump(exclude={"id", "services"})
-        target = Target(engagement_id=eng.id, **data,
-                        services=[Service(**s.model_dump()) for s in
-                                  {(s.port, s.protocol): s for s in t.services}.values()])
+        target = Target(engagement_id=eng.id, **t.model_dump(exclude={"id", "services"}),
+                        services=[Service(**s.model_dump()) for s in t.services])
         db.add(target)
         targets[t.id] = target
     db.flush()
 
-    def target_id(old: int | None) -> int | None:
-        if old is None:
-            return None
-        if old not in targets:
-            raise HandoffError("the file refers to a target it does not contain")
-        return targets[old].id
-
     findings: dict[int, Finding] = {}
-    numbers: set[int] = set()
     for f in m.findings:
-        if f.number in numbers:
-            raise HandoffError(f"duplicate finding number {f.number}")
-        numbers.add(f.number)
-        finding = Finding(engagement_id=eng.id, **f.model_dump(exclude={"id", "targets", "retests"}))
-        finding.targets = [targets[i] for i in dict.fromkeys(f.targets) if i in targets]
-        if len(finding.targets) != len(set(f.targets)):
-            raise HandoffError("the file refers to a target it does not contain")
-        finding.retests = [FindingRetest(**r.model_dump()) for r in f.retests]
+        finding = Finding(engagement_id=eng.id, **f.model_dump(exclude={"id", "targets", "retests"}),
+                          targets=[targets[i] for i in f.targets],
+                          retests=[FindingRetest(**r.model_dump()) for r in f.retests])
         db.add(finding)
         findings[f.id] = finding
     db.flush()
 
-    def finding_id(old: int | None) -> int | None:
-        if old is None:
-            return None
-        if old not in findings:
-            raise HandoffError("the file refers to a finding it does not contain")
-        return findings[old].id
-
     tests: dict[int, TestCase] = {}
     for tc in m.test_cases:
         row = TestCase(engagement_id=eng.id, **tc.model_dump(exclude={"id", "target", "finding"}),
-                       target_id=target_id(tc.target), finding_id=finding_id(tc.finding))
+                       target_id=new_id(targets, tc.target), finding_id=new_id(findings, tc.finding))
         db.add(row)
         tests[tc.id] = row
     for o in m.oplog:
@@ -514,16 +625,16 @@ def apply_manifest(db: Session, m: Manifest, blobs: dict[int, storage.StoredBlob
     db.flush()
 
     evidence: dict[int, Evidence] = {}
-    for ev in m.evidence:
+    for ev, blob in zip(m.evidence, blobs, strict=True):
         row = storage.add_evidence(
-            db, blobs[ev.id], engagement_id=eng.id, filename=ev.filename, content_type=ev.content_type,
-            description=ev.description, finding_id=finding_id(ev.finding), target_id=target_id(ev.target),
-            test_case_id=tests[ev.test_case].id if ev.test_case in tests else None)
+            db, blob, engagement_id=eng.id, filename=ev.filename, content_type=ev.content_type,
+            description=ev.description, finding_id=new_id(findings, ev.finding),
+            target_id=new_id(targets, ev.target), test_case_id=new_id(tests, ev.test_case))
         row.created_at = ev.created_at
         evidence[ev.id] = row
     for imp in m.imports:
-        db.add(ReconImport(engagement_id=eng.id, tool=imp.tool, filename=imp.filename, stats=imp.stats,
-                           evidence_id=evidence[imp.evidence].id if imp.evidence in evidence else None,
+        db.add(ReconImport(engagement_id=eng.id, tool=imp.tool, filename=imp.filename,
+                           stats=imp.stats.model_dump(), evidence_id=new_id(evidence, imp.evidence),
                            created_at=imp.created_at))
     db.flush()
     audit.record(db, action="import", entity_type="engagement", entity_id=eng.id, engagement_id=eng.id,
