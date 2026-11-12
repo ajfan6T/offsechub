@@ -348,3 +348,29 @@ export interface Dashboard {
     created_at: string;
   }[];
 }
+
+export interface ReportBranding {
+  organization: string;
+  accent: string;
+  classification: string;
+  footer: string;
+  logo_id: number | null;
+  default_template_id: number | null;
+}
+
+export interface ReportTemplate {
+  id: number;
+  name: string;
+  filename: string;
+  size: number;
+  sha256: string;
+  created_at: string;
+}
+
+export interface UpdateCheck {
+  current: string;
+  latest: string;
+  newer: boolean;
+  published_at: string;
+  download_url: string;
+}

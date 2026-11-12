@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .. import __version__
 from ..bootstrap import get_setting, set_setting
 from ..db import get_db, get_manager, get_vault
-from ..services import audit
+from ..services import audit, updates
 from ..vault.appconfig import default_vault_dir
 from ..vault.manager import OpenVault, VaultError, VaultInUse, VaultManager, WrongSecret
 
@@ -247,6 +247,15 @@ def app_info(request: Request):
         "platform": platform.system(),
         "default_vault_dir": str(default_vault_dir()),
     }
+
+
+@router.post("/api/app/update-check")
+def update_check():
+    """Ask GitHub for the latest release. Only ever runs when the user asks."""
+    try:
+        return updates.fetch_latest()
+    except updates.UpdateCheckFailed as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Update check failed: {exc}") from None
 
 
 @router.get("/api/app/recent")

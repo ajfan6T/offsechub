@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { api, qs } from "../../api";
 import { RichField } from "../../components/RichText";
-import { Button, Card, DownloadLink, useApiMutation } from "../../components/ui";
+import { Button, Card, DownloadLink, Field, useApiMutation } from "../../components/ui";
+import { useBranding, useReportTemplates } from "../Settings";
 import type { Engagement, TestCase } from "../../types";
 import { useEngagement, useFindings } from "./context";
 
@@ -20,6 +21,10 @@ export function Report() {
   const [drafts, setDrafts] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [summary, setSummary] = useState(e.executive_summary);
+  const templates = useReportTemplates();
+  const branding = useBranding();
+  const [templateChoice, setTemplateChoice] = useState<string | null>(null);
+  const templateId = templateChoice ?? String(branding.data?.default_template_id ?? "");
   const saveSummary = useApiMutation(() => api.patch<Engagement>(base, { executive_summary: summary }), {
     invalidate: [[base]],
     success: "Executive summary saved",
@@ -53,7 +58,9 @@ export function Report() {
     { ok: !!e.rules_of_engagement.trim(), label: "Rules of engagement recorded", link: ".." },
   ];
   const ready = checks.filter((c) => c.ok).length;
-  const url = (format: string, download = false) => `${base}/report${qs({ format, include_drafts: drafts || undefined, download: download || undefined })}`;
+  const url = (format: string, download = false, extra: Record<string, string | undefined> = {}) =>
+    `${base}/report${qs({ format, include_drafts: drafts || undefined, download: download || undefined, ...extra })}`;
+  const findingsUrl = (format: string) => `${base}/export/findings${qs({ format, include_drafts: drafts || undefined })}`;
 
   return (
     <div className="grid-1-2 align-start">
@@ -79,15 +86,31 @@ export function Report() {
             <input type="checkbox" checked={drafts} onChange={(ev) => setDrafts(ev.target.checked)} /> Include draft findings (internal QA copy)
           </label>
           <div className="actions wrap">
-            <DownloadLink className="btn btn-primary" href={url("html", true)} filename={`${e.code}-report.html`}>Save printable HTML</DownloadLink>
+            <DownloadLink className="btn btn-primary" href={url("pdf", true)} filename={`${e.code}-report.pdf`}>PDF</DownloadLink>
+            <DownloadLink className="btn btn-primary" href={url("docx", true, { template_id: templateId || undefined })} filename={`${e.code}-report.docx`}>Word</DownloadLink>
+            <DownloadLink className="btn btn-secondary" href={url("html", true)} filename={`${e.code}-report.html`}>HTML</DownloadLink>
             <DownloadLink className="btn btn-secondary" href={url("md", true)} filename={`${e.code}-report.md`}>Markdown</DownloadLink>
             <DownloadLink className="btn btn-secondary" href={url("json", true)} filename={`${e.code}-report.json`}>JSON</DownloadLink>
           </div>
+          {!!templates.data?.length && (
+            <Field label="Word template">
+              <select value={templateId} onChange={(ev) => setTemplateChoice(ev.target.value)}>
+                <option value="">Built-in</option>
+                {templates.data.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </Field>
+          )}
           <p className="muted small">
-            For a PDF, open the saved HTML file in your browser, then Print → Save as PDF. The file is self-contained (images
-            embedded, no scripts). {reportable.length} finding(s) will be included. Every export is recorded in the activity
-            log.
+            Branding, the logo and Word templates are set in <Link to="/settings">Settings</Link>. {reportable.length} finding(s)
+            will be included. Every export is recorded in the activity log.
           </p>
+          <h4 className="subhead">Findings for ticketing</h4>
+          <div className="actions wrap">
+            <DownloadLink className="btn btn-secondary btn-sm" href={findingsUrl("csv")} filename={`${e.code}-findings.csv`}>CSV (Jira)</DownloadLink>
+            <DownloadLink className="btn btn-secondary btn-sm" href={findingsUrl("sarif")} filename={`${e.code}-findings.sarif`}>SARIF</DownloadLink>
+            <DownloadLink className="btn btn-secondary btn-sm" href={findingsUrl("defectdojo")} filename={`${e.code}-defectdojo.json`}>DefectDojo</DownloadLink>
+          </div>
+          <p className="muted small">One row or result per finding, for Jira's CSV import, SARIF viewers or DefectDojo's generic importer.</p>
         </Card>
       </div>
       <Card title="Preview" actions={<Button size="sm" variant="ghost" onClick={() => setNonce((n) => n + 1)}>Refresh</Button>}>

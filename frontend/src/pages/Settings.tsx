@@ -1,11 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api } from "../api";
 import {
   Button,
   Card,
   ConfirmButton,
   CopyButton,
+  DownloadLink,
   ErrorBox,
   Field,
   Loading,
@@ -14,8 +15,16 @@ import {
   useApiMutation,
 } from "../components/ui";
 import { joinPath, useDesktopBridge } from "../lib/desktop";
-import { fmtBytes } from "../lib/format";
-import type { BackupResult, Profile, RecoveryKeyResult, VerifyResult } from "../types";
+import { fmtBytes, fmtDate } from "../lib/format";
+import type {
+  BackupResult,
+  Profile,
+  RecoveryKeyResult,
+  ReportBranding,
+  ReportTemplate,
+  UpdateCheck,
+  VerifyResult,
+} from "../types";
 import { EMPTY_PASSWORD, isValidNewPassword, NewPasswordFields, PathField } from "../vault/common";
 import {
   PROFILE_KEY,
@@ -45,6 +54,8 @@ export function Settings() {
       <div className="grid-2 align-start">
         <div className="stack">
           <ProfileCard />
+          <BrandingCard />
+          <TemplatesCard />
           <PasswordCard />
           <KeysCard />
         </div>
@@ -469,8 +480,10 @@ function AboutCard() {
         Everything in this vault lives in one folder on this machine, encrypted with AES-256-GCM under a master key that
         only your password (via Argon2id) or your recovery key can unwrap. Each save and each evidence file gets its own
         key, and the vault header holds no client data. Decrypted data exists only in OffsecHub's memory while the vault
-        is unlocked. Nothing is sent over the network: there is no server, no account and no telemetry.
+        is unlocked. There is no server, no account and no telemetry. The only network request OffsecHub ever makes is
+        the update check below, and only when you click it.
       </p>
+      <UpdateCheckButton />
       <p className="small muted">
         Not hidden: the folder name, the number and sizes of evidence files, and file timestamps.
       </p>
@@ -485,5 +498,178 @@ function AboutCard() {
         <span className="muted">(open in your browser)</span>
       </p>
     </Card>
+  );
+}
+
+// ------------------------------------------------------------------ reports
+
+const BRANDING_KEY = ["report-branding"];
+const TEMPLATES_KEY = ["report-templates"];
+
+export function useBranding() {
+  return useQuery({ queryKey: BRANDING_KEY, queryFn: () => api.get<ReportBranding>("/api/report-branding") });
+}
+
+export function useReportTemplates() {
+  return useQuery({ queryKey: TEMPLATES_KEY, queryFn: () => api.get<ReportTemplate[]>("/api/report-templates") });
+}
+
+function BrandingCard() {
+  const q = useBranding();
+  return (
+    <Card title="Report branding">
+      {q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} /> : <BrandingForm key={JSON.stringify(q.data)} branding={q.data!} />}
+    </Card>
+  );
+}
+
+function BrandingForm({ branding }: { branding: ReportBranding }) {
+  const profile = useProfile();
+  const [form, setForm] = useState({
+    organization: branding.organization,
+    classification: branding.classification,
+    footer: branding.footer,
+    accent: branding.accent,
+  });
+  const logoInput = useRef<HTMLInputElement>(null);
+  const changed = (Object.keys(form) as (keyof typeof form)[]).some((k) => form[k] !== branding[k]);
+  const validAccent = /^#[0-9a-fA-F]{6}$/.test(form.accent);
+  const save = useApiMutation(() => api.put<ReportBranding>("/api/report-branding", form), {
+    invalidate: [BRANDING_KEY],
+    success: "Branding saved",
+  });
+  const upload = useApiMutation((file: File) => api.upload<ReportBranding>("/api/report-branding/logo", file), {
+    invalidate: [BRANDING_KEY],
+    success: "Logo uploaded",
+    onSuccess: () => logoInput.current && (logoInput.current.value = ""),
+  });
+  const removeLogo = useApiMutation(() => api.del("/api/report-branding/logo"), { invalidate: [BRANDING_KEY], success: "Logo removed" });
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+
+  return (
+    <div className="form-grid single">
+      <p className="muted small">Applied to every report format (PDF, Word, HTML, Markdown). Stored inside this vault.</p>
+      <Field label="Organisation" hint={profile.data?.organization ? `Defaults to your profile: ${profile.data.organization}` : undefined}>
+        <input value={form.organization} onChange={set("organization")} placeholder={profile.data?.organization || "Your company"} />
+      </Field>
+      <Field label="Classification" hint="Shown on the cover and in the page header; leave empty to omit">
+        <input value={form.classification} onChange={set("classification")} placeholder="CONFIDENTIAL" />
+      </Field>
+      <Field label="Footer text">
+        <input value={form.footer} onChange={set("footer")} placeholder="e.g. Example Security Ltd, registered in England 01234567" />
+      </Field>
+      <Field label="Accent colour" hint={validAccent ? undefined : "Use a colour like #0f766e"}>
+        <div className="row">
+          <input type="color" className="color-input" value={validAccent ? form.accent : "#0f766e"} onChange={set("accent")} aria-label="Pick the accent colour" />
+          <input className="mono" value={form.accent} onChange={set("accent")} maxLength={7} />
+        </div>
+      </Field>
+      <div className="logo-row">
+        {branding.logo_id ? (
+          <img className="logo-preview" src={`/api/report-branding/logo?v=${branding.logo_id}`} alt="Report logo" />
+        ) : (
+          <span className="muted small">No logo</span>
+        )}
+        <input ref={logoInput} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />
+        <Button size="sm" loading={upload.isPending} onClick={() => logoInput.current?.click()}>{branding.logo_id ? "Replace logo" : "Upload logo"}</Button>
+        {branding.logo_id && <Button size="sm" variant="ghost" onClick={() => removeLogo.mutate(undefined)}>Remove</Button>}
+      </div>
+      <p className="muted small">PNG or JPEG, up to 1 MB.</p>
+      <div className="actions">
+        <Button variant="primary" disabled={!changed || !validAccent} loading={save.isPending} onClick={() => save.mutate(undefined)}>Save branding</Button>
+      </div>
+    </div>
+  );
+}
+
+function TemplatesCard() {
+  const templates = useReportTemplates();
+  const branding = useBranding();
+  const input = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState("");
+  const upload = useApiMutation((file: File) => api.upload<ReportTemplate>("/api/report-templates/upload", file, { name }), {
+    invalidate: [TEMPLATES_KEY],
+    success: (t) => `Template "${t.name}" added`,
+    onSuccess: () => {
+      setName("");
+      if (input.current) input.current.value = "";
+    },
+  });
+  const setDefault = useApiMutation((id: number | null) => api.put("/api/report-branding", { default_template_id: id }), {
+    invalidate: [BRANDING_KEY],
+    success: "Default Word template updated",
+  });
+  const remove = useApiMutation((id: number) => api.del(`/api/report-templates/${id}`), {
+    invalidate: [TEMPLATES_KEY, BRANDING_KEY],
+    success: "Template deleted",
+  });
+  const defaultId = branding.data?.default_template_id ?? null;
+
+  return (
+    <Card title="Word report templates">
+      <p className="small">
+        Start from the built-in template, restyle it in Word (fonts, colours, cover, sections), then upload it. Templates use
+        Jinja tags such as <code>{"{{ client.name }}"}</code>; see the{" "}
+        <a href={`${DOCS_URL}/REPORT_TEMPLATES.md`} target="_blank" rel="noreferrer">template guide</a>.
+      </p>
+      <div className="actions">
+        <DownloadLink className="btn btn-secondary btn-sm" href="/api/report-templates/builtin/download" filename="offsechub-report-template.docx">
+          Download the built-in template
+        </DownloadLink>
+      </div>
+      <table className="table compact">
+        <tbody>
+          <tr>
+            <td>
+              <label className="check">
+                <input type="radio" name="default-template" checked={defaultId === null} onChange={() => setDefault.mutate(null)} /> Built-in
+              </label>
+            </td>
+            <td className="muted small">OffsecHub default</td>
+            <td />
+          </tr>
+          {templates.data?.map((t) => (
+            <tr key={t.id}>
+              <td>
+                <label className="check">
+                  <input type="radio" name="default-template" checked={defaultId === t.id} onChange={() => setDefault.mutate(t.id)} /> {t.name}
+                </label>
+              </td>
+              <td className="muted small">{fmtBytes(t.size)} · {fmtDate(t.created_at)}</td>
+              <td className="nowrap">
+                <DownloadLink className="link small" href={`/api/report-templates/${t.id}/download`} filename={t.filename}>Download</DownloadLink>{" "}
+                <ConfirmButton variant="ghost" size="sm" message={`Delete the template "${t.name}"?`} onConfirm={() => remove.mutate(t.id)}>Delete</ConfirmButton>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="muted small">The selected template is the default for Word exports; you can pick another when exporting.</p>
+      <div className="row">
+        <input placeholder="Name (optional)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Template name" />
+        <input ref={input} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />
+        <Button loading={upload.isPending} onClick={() => input.current?.click()}>Upload template</Button>
+      </div>
+    </Card>
+  );
+}
+
+function UpdateCheckButton() {
+  const check = useMutation({ mutationFn: () => api.post<UpdateCheck>("/api/app/update-check") });
+  return (
+    <div className="update-check">
+      <Button size="sm" loading={check.isPending} onClick={() => check.mutate()}>Check for updates</Button>
+      {check.data &&
+        (check.data.newer ? (
+          <span className="small">
+            OffsecHub {check.data.latest} is available.{" "}
+            <a href={check.data.download_url} target="_blank" rel="noreferrer">Download it</a> <span className="muted">(opens your browser)</span>
+          </span>
+        ) : (
+          <span className="small muted">You have the latest version ({check.data.current}).</span>
+        ))}
+      {check.error && <span className="small error-text">{(check.error as Error).message}</span>}
+      <p className="muted small">Asks GitHub for the latest release number. Nothing about your vault is sent, and nothing is downloaded or installed.</p>
+    </div>
   );
 }

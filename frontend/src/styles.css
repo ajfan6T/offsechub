@@ -440,3 +440,12 @@ button.thumb, .thumb-btn { cursor: zoom-in; }
 .retest-head .btn { margin-left: auto; }
 .retest .rich { margin-top: 6px; font-size: 13px; }
 .retest-cell { margin-top: 4px; }
+
+/* Settings: report branding and templates */
+.color-input { width: 44px; height: 34px; padding: 2px; flex: none; }
+.logo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logo-preview { max-height: 40px; max-width: 160px; background: #fff; border-radius: 4px; padding: 3px; }
+.update-check { display: grid; gap: 6px; justify-items: start; margin-top: 8px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > input:not([type="color"]) { flex: 1; min-width: 0; }
+.subhead { margin: 18px 0 8px; font-size: 13px; }
