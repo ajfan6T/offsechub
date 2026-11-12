@@ -227,10 +227,16 @@ jobs:
           cp "offsechub_${VERSION}_arm64.deb" offsechub_arm64.deb
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes from CHANGELOG.md (the section for this version)
+        run: |
+          awk -v v="$VERSION" '/^## /{ if (p) exit; p = ($2 == v); next } p' CHANGELOG.md > release-notes.md
+          test -s release-notes.md || echo "No changelog entry for $VERSION." > release-notes.md
+          cat release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           name: OffsecHub ${{ env.VERSION }}
+          body_path: release-notes.md
           files: dist/*
           generate_release_notes: true

@@ -184,6 +184,7 @@ docs/                      vault format, threat model, architecture, case study
 - [Case study](docs/CASE_STUDY.md): the pivot, design principles, and what adversarial review found
 - [Code signing](docs/CODE_SIGNING.md): signed and notarized releases, and how to set up the credentials
 - [Report templates](docs/REPORT_TEMPLATES.md): make your own Word report template
+- [Changelog](CHANGELOG.md): what changed in each release
 
 ## Licence
 
