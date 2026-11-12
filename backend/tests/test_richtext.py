@@ -3,10 +3,10 @@
 import html
 import re
 
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from app.services.richtext import Span, is_plain, parse, parse_inline, to_html
+from app.services.richtext import _FENCE, Span, is_plain, parse, parse_inline, to_html
 
 
 def styles(text):
@@ -132,6 +132,13 @@ def test_unclosed_fence_runs_to_the_end():
     assert blocks[0].text == "raw <b>\nstill code"
 
 
+def test_fence_language_is_not_shown():
+    # As in Markdown, the word after an opening fence names the language; it is not content.
+    blocks = parse("```python\nprint(1)\n```")
+    assert [(b.kind, b.text) for b in blocks] == [("code", "print(1)")]
+    assert "python" not in to_html("```python\nprint(1)\n```")
+
+
 def test_wildcard_bullet_is_not_a_list():
     blocks = parse("*.acme.example is in scope")
     assert [b.kind for b in blocks] == ["paragraph"]
@@ -181,7 +188,9 @@ def test_html_never_emits_unescaped_markup(text):
 @settings(max_examples=400, deadline=None)
 @given(st.text(alphabet=st.sampled_from(list("ab *_`\n<&x")), max_size=60))
 def test_no_text_is_lost_outside_markers(text):
-    # Every letter that isn't a formatting marker survives into the HTML.
+    # Every letter that isn't a formatting marker survives into the HTML. (A fence's
+    # language word is the one exception, tested above.)
+    assume(not any((m := _FENCE.match(line)) and m.group(2) for line in text.split("\n")))
     visible = html.unescape(TAG.sub("", to_html(text)))
     for ch in "abx<&":
         assert visible.count(ch) == text.count(ch), (text, visible)
